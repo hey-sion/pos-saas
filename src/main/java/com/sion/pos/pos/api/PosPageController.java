@@ -1,0 +1,13 @@
+package com.sion.pos.pos.api;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+
+@Controller
+public class PosPageController {
+
+    @GetMapping({"/", "/pos"})
+    public String pos() {
+        return "pos/index";
+    }
+}
