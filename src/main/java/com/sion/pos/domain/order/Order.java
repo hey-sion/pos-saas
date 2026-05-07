@@ -1,6 +1,6 @@
-package com.sion.pos.order.domain;
+package com.sion.pos.domain.order;
 
-import com.sion.pos.global.domain.BaseEntity;
+import com.sion.pos.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

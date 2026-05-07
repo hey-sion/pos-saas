@@ -1,6 +1,6 @@
-package com.sion.pos.menu.api;
+package com.sion.pos.interfaces.api.menu;
 
-import com.sion.pos.menu.domain.Menu;
+import com.sion.pos.domain.menu.Menu;
 
 public record MenuResponse(
         Long id,

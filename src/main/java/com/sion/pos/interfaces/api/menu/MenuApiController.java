@@ -1,6 +1,6 @@
-package com.sion.pos.menu.api;
+package com.sion.pos.interfaces.api.menu;
 
-import com.sion.pos.menu.application.MenuService;
+import com.sion.pos.application.menu.MenuService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

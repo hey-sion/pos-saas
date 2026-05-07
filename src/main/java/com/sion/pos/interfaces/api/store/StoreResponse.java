@@ -1,6 +1,6 @@
-package com.sion.pos.store.api;
+package com.sion.pos.interfaces.api.store;
 
-import com.sion.pos.store.domain.Store;
+import com.sion.pos.domain.store.Store;
 
 public record StoreResponse(
         Long id,

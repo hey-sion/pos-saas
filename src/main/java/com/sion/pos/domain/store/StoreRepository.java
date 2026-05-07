@@ -1,4 +1,4 @@
-package com.sion.pos.store.domain;
+package com.sion.pos.domain.store;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

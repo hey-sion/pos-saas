@@ -1,6 +1,6 @@
-package com.sion.pos.menu.domain;
+package com.sion.pos.domain.menu;
 
-import com.sion.pos.global.domain.BaseEntity;
+import com.sion.pos.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;

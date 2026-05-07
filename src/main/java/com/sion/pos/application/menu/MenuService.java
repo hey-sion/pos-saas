@@ -1,7 +1,7 @@
-package com.sion.pos.menu.application;
+package com.sion.pos.application.menu;
 
-import com.sion.pos.menu.domain.Menu;
-import com.sion.pos.menu.domain.MenuRepository;
+import com.sion.pos.domain.menu.Menu;
+import com.sion.pos.domain.menu.MenuRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

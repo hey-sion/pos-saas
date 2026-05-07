@@ -1,7 +1,7 @@
-package com.sion.pos.store.application;
+package com.sion.pos.application.store;
 
-import com.sion.pos.store.domain.Store;
-import com.sion.pos.store.domain.StoreRepository;
+import com.sion.pos.domain.store.Store;
+import com.sion.pos.domain.store.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

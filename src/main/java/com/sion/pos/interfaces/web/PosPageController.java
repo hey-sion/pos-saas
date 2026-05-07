@@ -1,4 +1,4 @@
-package com.sion.pos.pos.api;
+package com.sion.pos.interfaces.web;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;

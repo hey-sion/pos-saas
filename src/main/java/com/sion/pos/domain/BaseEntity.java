@@ -1,4 +1,4 @@
-package com.sion.pos.global.domain;
+package com.sion.pos.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;

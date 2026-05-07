@@ -1,6 +1,6 @@
-package com.sion.pos.store.api;
+package com.sion.pos.interfaces.api.store;
 
-import com.sion.pos.store.application.StoreService;
+import com.sion.pos.application.store.StoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

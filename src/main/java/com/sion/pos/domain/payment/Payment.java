@@ -1,6 +1,6 @@
-package com.sion.pos.payment.domain;
+package com.sion.pos.domain.payment;
 
-import com.sion.pos.global.domain.BaseEntity;
+import com.sion.pos.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
