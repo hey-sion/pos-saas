@@ -22,10 +22,20 @@ public class Payment extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private Type type;
+    private Method method;
 
-    @Column(name = "pg_payment_id", length = 100)
-    private String pgPaymentId;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Channel channel;
+
+    @Column(nullable = false)
+    private Integer amount;
+
+    @Column(name = "pg_order_code", length = 100)
+    private String pgOrderCode;
+
+    @Column(name = "pg_transaction_key", length = 100)
+    private String pgTransactionKey;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
@@ -35,25 +45,32 @@ public class Payment extends BaseEntity {
     @Column(nullable = false, length = 20)
     private Status status = Status.PENDING;
 
+    @Column(name = "fail_reason", length = 255)
+    private String failReason;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
     public enum Status {
         PENDING,
         COMPLETED,
-        CANCELLED
+        FAILED
     }
 
-    public enum Type {
+    public enum Method {
         CASH,
         CARD,
+        EASY_PAY
+    }
+
+    public enum Channel {
+        OFFLINE,
         PG
     }
 
     public enum Provider {
         KAKAO_PAY,
         NAVER_PAY,
-        TOSS_PAY,
-        UNKNOWN
+        TOSS_PAY
     }
 }
