@@ -1,6 +1,8 @@
 package com.sion.pos.domain.payment;
 
 import com.sion.pos.domain.BaseEntity;
+import com.sion.pos.support.error.ErrorType;
+import com.sion.pos.support.error.PosApplicationException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -50,6 +52,63 @@ public class Payment extends BaseEntity {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    public static Payment create(Long orderId, Method method, Channel channel, Integer amount, LocalDateTime paidAt) {
+        if (orderId == null || orderId <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "orderId는 1 이상이어야 합니다.");
+        }
+
+        if (method == null) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "method는 필수입니다.");
+        }
+
+        if (channel == null) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "channel은 필수입니다.");
+        }
+
+        if (amount == null || amount <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "amount는 1 이상이어야 합니다.");
+        }
+
+        Payment payment = new Payment();
+        payment.orderId = orderId;
+        payment.method = method;
+        payment.channel = channel;
+        payment.amount = amount;
+
+        if (paidAt != null) {
+            payment.status = Status.COMPLETED;
+            payment.paidAt = paidAt;
+        } else {
+            payment.status = Status.PENDING;
+        }
+
+        return payment;
+    }
+
+    public void complete(LocalDateTime paidAt) {
+        if (paidAt == null) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "paidAt은 필수입니다.");
+        }
+
+        if (this.status != Status.PENDING) {
+            throw new PosApplicationException(ErrorType.CONFLICT,
+                    "결제 대기 상태에서만 완료 처리 가능합니다. 현재 상태: " + this.status);
+        }
+
+        this.status = Status.COMPLETED;
+        this.paidAt = paidAt;
+    }
+
+    public void fail(String reason) {
+        if (this.status != Status.PENDING) {
+            throw new PosApplicationException(ErrorType.CONFLICT,
+                    "결제 대기 상태에서만 실패 처리 가능합니다. 현재 상태: " + this.status);
+        }
+
+        this.status = Status.FAILED;
+        this.failReason = reason;
+    }
 
     public enum Status {
         PENDING,
