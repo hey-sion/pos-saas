@@ -1,6 +1,8 @@
 package com.sion.pos.domain.menu;
 
 import com.sion.pos.domain.BaseEntity;
+import com.sion.pos.support.error.ErrorType;
+import com.sion.pos.support.error.PosApplicationException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -28,4 +30,24 @@ public class Menu extends BaseEntity {
 
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder = 0;
+
+    public static Menu create(Long storeId, String name, Integer price, Integer sortOrder) {
+        if (storeId == null || storeId <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "storeId는 1 이상이어야 합니다.");
+        }
+        if (name == null || name.isBlank()) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "name은 필수입니다.");
+        }
+        if (price == null || price <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "price는 1 이상이어야 합니다.");
+        }
+
+        Menu menu = new Menu();
+        menu.storeId = storeId;
+        menu.name = name;
+        menu.price = price;
+        menu.sortOrder = sortOrder != null ? sortOrder : 0;
+        menu.active = true;
+        return menu;
+    }
 }
