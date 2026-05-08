@@ -32,6 +32,7 @@ public class OrderFacade {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
+    private final OrderNumberIssuer orderNumberIssuer;
 
     @Transactional
     public Order create(OrderCreateCommand command) {
@@ -62,9 +63,7 @@ public class OrderFacade {
                                .sum();
 
         LocalDate orderDate = LocalDate.now();
-        int orderNumber = orderRepository
-                            .findMaxOrderNumberByStoreIdAndOrderDate(command.storeId(), orderDate)
-                            .orElse(0) + 1;
+        int orderNumber = orderNumberIssuer.issue(command.storeId(), orderDate);
 
         Order order = orderRepository.save(Order.create(command.storeId(), orderDate, orderNumber, totalAmount));
 
