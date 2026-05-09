@@ -3,6 +3,7 @@ package com.sion.pos.interfaces.api.order;
 import com.sion.pos.application.order.OrderFacade;
 import com.sion.pos.application.order.OrderService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,5 +45,13 @@ public class OrderV1ApiController {
         return orderService.getWaitingOrders(storeId).stream()
                            .map(WaitingOrderResponse::from)
                            .toList();
+    }
+
+    @GetMapping("/daily-summary")
+    public DailyOrderSummaryResponse getDailySummary(
+            @RequestParam Long storeId,
+            @RequestParam LocalDate date
+    ) {
+        return DailyOrderSummaryResponse.from(orderService.getDailySummary(storeId, date));
     }
 }

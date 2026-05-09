@@ -15,6 +15,7 @@ import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.DatabaseCleanUp;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -259,6 +260,79 @@ class OrderV1ApiE2ETest {
         }
     }
 
+    @Nested
+    @DisplayName("일별 주문 요약 조회 시, ")
+    class DailySummary {
+
+        @Test
+        @DisplayName("전체 주문을 주문번호 오름차순으로 반환한다.")
+        void returnsOrdersOrderedByOrderNumber() {
+            LocalDate today = LocalDate.now();
+            Long firstOrderId = createOrder(Payment.Method.CASH);
+            Long secondOrderId = createOrder(Payment.Method.CARD);
+            Long thirdOrderId = createOrder(Payment.Method.CASH);
+            updateOrderStatus(firstOrderId, Order.Status.DELIVERED);
+            updateOrderStatus(secondOrderId, Order.Status.CANCELLED);
+
+            ResponseEntity<DailyOrderSummaryResponse> response =
+                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?storeId=" + storeId + "&date=" + today,
+                            HttpMethod.GET, HttpEntity.EMPTY, DailyOrderSummaryResponse.class);
+
+            DailyOrderSummaryResponse body = response.getBody();
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(body.date()).isEqualTo(today),
+                    () -> assertThat(body.totalOrderCount()).isEqualTo(3),
+                    () -> assertThat(body.orders()).extracting(DailyOrderSummaryResponse.OrderResponse::id)
+                                                  .containsExactly(firstOrderId, secondOrderId, thirdOrderId),
+                    () -> assertThat(body.orders()).extracting(DailyOrderSummaryResponse.OrderResponse::status)
+                                                  .containsExactly("DELIVERED", "CANCELLED", "RECEIVED")
+            );
+        }
+
+        @Test
+        @DisplayName("전달 완료 주문만 매출로 집계한다.")
+        void calculatesSalesOnlyWithDeliveredOrders() {
+            LocalDate today = LocalDate.now();
+            Long deliveredOrderId = createOrder(Payment.Method.CASH);
+            Long cancelledOrderId = createOrder(Payment.Method.CARD);
+            createOrder(Payment.Method.CASH);
+            updateOrderStatus(deliveredOrderId, Order.Status.DELIVERED);
+            updateOrderStatus(cancelledOrderId, Order.Status.CANCELLED);
+
+            ResponseEntity<DailyOrderSummaryResponse> response =
+                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?storeId=" + storeId + "&date=" + today,
+                            HttpMethod.GET, HttpEntity.EMPTY, DailyOrderSummaryResponse.class);
+
+            DailyOrderSummaryResponse body = response.getBody();
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(body.salesAmount()).isEqualTo(AMERICANO_PRICE),
+                    () -> assertThat(body.salesOrderCount()).isEqualTo(1),
+                    () -> assertThat(body.totalOrderCount()).isEqualTo(3)
+            );
+        }
+
+        @Test
+        @DisplayName("주문이 없으면, 매출과 주문 건수가 0이고 빈 주문 내역을 반환한다.")
+        void returnsEmptySummary_whenOrdersDoNotExist() {
+            LocalDate dateWithoutOrders = LocalDate.now().minusDays(1);
+
+            ResponseEntity<DailyOrderSummaryResponse> response =
+                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?storeId=" + storeId + "&date=" + dateWithoutOrders,
+                            HttpMethod.GET, HttpEntity.EMPTY, DailyOrderSummaryResponse.class);
+
+            DailyOrderSummaryResponse body = response.getBody();
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(body.salesAmount()).isZero(),
+                    () -> assertThat(body.salesOrderCount()).isZero(),
+                    () -> assertThat(body.totalOrderCount()).isZero(),
+                    () -> assertThat(body.orders()).isEmpty()
+            );
+        }
+    }
+
     private Long createOrder(Payment.Method method) {
         OrderCreateRequest request = new OrderCreateRequest(
                 storeId,
@@ -278,5 +352,11 @@ class OrderV1ApiE2ETest {
                         HttpEntity.EMPTY, new ParameterizedTypeReference<>() {});
 
         return response.getBody();
+    }
+
+    private void updateOrderStatus(Long orderId, Order.Status status) {
+        OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(status);
+        testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/status", HttpMethod.PATCH,
+                new HttpEntity<>(request), Void.class);
     }
 }

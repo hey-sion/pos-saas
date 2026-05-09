@@ -11,4 +11,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             LocalDate orderDate,
             Order.Status status
     );
+
+    List<Order> findByStoreIdAndOrderDateOrderByOrderNumberAsc(Long storeId, LocalDate orderDate);
 }

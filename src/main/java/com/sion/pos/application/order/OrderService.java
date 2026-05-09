@@ -60,6 +60,37 @@ public class OrderService {
                      .toList();
     }
 
+    @Transactional(readOnly = true)
+    public DailyOrderSummaryInfo getDailySummary(Long storeId, LocalDate date) {
+        List<Order> orders = orderRepository.findByStoreIdAndOrderDateOrderByOrderNumberAsc(storeId, date);
+        if (orders.isEmpty()) {
+            return new DailyOrderSummaryInfo(date, 0, 0, 0, List.of());
+        }
+
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+        Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdInOrderByIdAsc(orderIds).stream()
+                                                                       .collect(Collectors.groupingBy(OrderItem::getOrderId));
+        Map<Long, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(orderIds).stream()
+                                                               .collect(Collectors.toMap(Payment::getOrderId, payment -> payment));
+
+        int salesAmount = orders.stream()
+                                .filter(order -> order.getStatus() == Order.Status.DELIVERED)
+                                .mapToInt(Order::getTotalAmount)
+                                .sum();
+        int salesOrderCount = (int) orders.stream()
+                                          .filter(order -> order.getStatus() == Order.Status.DELIVERED)
+                                          .count();
+
+        List<DailyOrderSummaryInfo.OrderInfo> orderInfos = orders.stream()
+                                                                 .map(order -> toDailyOrderInfo(
+                                                                         order,
+                                                                         itemsByOrderId.getOrDefault(order.getId(), List.of()),
+                                                                         paymentByOrderId.get(order.getId())))
+                                                                 .toList();
+
+        return new DailyOrderSummaryInfo(date, salesAmount, salesOrderCount, orders.size(), orderInfos);
+    }
+
     private WaitingOrderInfo toWaitingOrderInfo(Order order, List<OrderItem> items, Payment payment) {
         return new WaitingOrderInfo(
                 order.getId(),
@@ -79,5 +110,18 @@ public class OrderService {
         }
 
         return "PENDING";
+    }
+
+    private DailyOrderSummaryInfo.OrderInfo toDailyOrderInfo(Order order, List<OrderItem> items, Payment payment) {
+        return new DailyOrderSummaryInfo.OrderInfo(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getStatus().name(),
+                items.stream()
+                     .map(item -> new DailyOrderSummaryInfo.Item(item.getMenuName(), item.getQuantity()))
+                     .toList(),
+                payment != null ? payment.getMethod().name() : null,
+                order.getTotalAmount()
+        );
     }
 }
