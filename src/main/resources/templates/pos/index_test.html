@@ -594,12 +594,12 @@
 
 <div id="toast" class="toast"></div>
 
-<div id="qrOverlay" class="qr-overlay">
-    <div class="qr-modal">
-        <div class="qr-order-num">주문 <span id="qrOrderNum">#1</span></div>
+<div id="qrOverlay" class="qr-overlay" aria-hidden="true">
+    <div class="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+        <div class="qr-order-num" id="qrTitle">간편결제</div>
         <div class="qr-amount" id="qrAmount">0원</div>
         <div class="qr-placeholder">
-            <svg width="88" height="88" viewBox="0 0 80 80" fill="none">
+            <svg width="88" height="88" viewBox="0 0 80 80" fill="none" aria-hidden="true">
                 <rect x="2" y="2" width="26" height="26" rx="2" stroke="#d1d6db" stroke-width="2"/>
                 <rect x="8" y="8" width="14" height="14" rx="1" fill="#d1d6db"/>
                 <rect x="52" y="2" width="26" height="26" rx="2" stroke="#d1d6db" stroke-width="2"/>
@@ -614,22 +614,9 @@
                 <rect x="66" y="66" width="12" height="12" rx="1" fill="#d1d6db" opacity="0.2"/>
             </svg>
         </div>
-        <div class="qr-hint">고객이 QR을 스캔해주세요</div>
+        <div class="qr-hint" id="qrHint">QR 생성 대기</div>
         <div class="qr-btns">
-            <button class="qr-btn primary" onclick="simulatePay()">결제 시뮬레이션</button>
-            <button class="qr-btn" onclick="closeQR()">닫기</button>
-        </div>
-    </div>
-</div>
-
-<div id="customOverlay" class="custom-overlay">
-    <div class="custom-modal">
-        <h3>직접 입력</h3>
-        <input type="text" id="customName" placeholder="메뉴명">
-        <input type="number" id="customPrice" placeholder="가격 (원)">
-        <div class="custom-btns">
-            <button class="custom-btn" onclick="closeCustom()">취소</button>
-            <button class="custom-btn primary" onclick="addCustom()">추가</button>
+            <button class="qr-btn" id="qrCloseButton" type="button">닫기</button>
         </div>
     </div>
 </div>
@@ -638,8 +625,8 @@
     <div class="header-left">
         <span class="logo">POS</span>
         <nav class="tabs">
-            <button class="tab active" data-tab="menu" onclick="switchTab('menu')">메뉴</button>
-            <button class="tab" data-tab="mgmt" onclick="switchTab('mgmt')">관리</button>
+            <button class="tab active" data-tab="menu">메뉴</button>
+            <button class="tab" data-tab="mgmt">관리</button>
         </nav>
     </div>
     <div class="header-right">
@@ -657,7 +644,7 @@
         <div class="order-card" id="orderCard">
             <div class="order-header">
                 <h2>현재 주문</h2>
-                <button class="clear-btn" onclick="clearOrder()">전체 삭제</button>
+                <button class="clear-btn">전체 삭제</button>
             </div>
             <div class="order-items" id="orderItems">
                 <div class="order-empty">메뉴를 선택해주세요</div>
@@ -667,9 +654,9 @@
                 <span class="amount" id="orderTotal">0원</span>
             </div>
             <div class="pay-row">
-                <button class="pay-btn" id="btnCash" disabled onclick="payCash()">현금</button>
-                <button class="pay-btn" id="btnCard" disabled onclick="payCard()">카드 단말기</button>
-                <button class="pay-btn qr" id="btnQr" disabled onclick="payQR()">간편결제</button>
+                <button class="pay-btn" id="btnCash" disabled>현금</button>
+                <button class="pay-btn" id="btnCard" disabled>카드 단말기</button>
+                <button class="pay-btn qr" id="btnQr" disabled>간편결제</button>
             </div>
         </div>
     </section>
@@ -698,350 +685,6 @@
     </aside>
 </div>
 
-<script>
-    const STORE_ID = 1;
-    const fmt = n => new Intl.NumberFormat('ko-KR').format(n) + '원';
-
-    let order = [];
-    let orderNum = 0;
-    let slots = [];
-    let dailySales = 0;
-    let dailyCount = 0;
-    let currentQRSlotId = null;
-    let orderHistory = [];
-
-    /* ── Init ── */
-    function init() {
-        loadBusinessDate();
-        loadStore();
-        loadMenus();
-        renderOrder();
-        renderSlots();
-    }
-
-    function loadBusinessDate() {
-        const today = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-        document.getElementById('businessDate').textContent = `영업일: ${today}`;
-    }
-
-    async function loadStore() {
-        try {
-            const res = await fetch(`/api/stores/${STORE_ID}`);
-            if (res.ok) {
-                const store = await res.json();
-                document.getElementById('storeName').textContent = `${store.name}`;
-            }
-        } catch (e) { /* fallback */ }
-    }
-
-    async function loadMenus() {
-        const grid = document.getElementById('menuGrid');
-        const empty = document.getElementById('emptyMessage');
-        try {
-            const res = await fetch(`/api/menus?storeId=${STORE_ID}`);
-            if (!res.ok) throw new Error();
-            const menus = await res.json();
-
-            grid.innerHTML = '';
-            menus.forEach(m => {
-                const btn = document.createElement('button');
-                btn.className = 'menu-btn';
-                btn.innerHTML = `<span class="name">${m.name}</span><span class="price">${fmt(m.price)}</span>`;
-                btn.onclick = () => addItem(m.name, m.price);
-                grid.appendChild(btn);
-            });
-
-            // 직접 입력 버튼
-            const customBtn = document.createElement('button');
-            customBtn.className = 'menu-btn custom';
-            customBtn.innerHTML = '<span class="name">직접 입력</span><span class="price">가격 수정</span>';
-            customBtn.onclick = openCustom;
-            grid.appendChild(customBtn);
-
-            empty.hidden = menus.length > 0;
-        } catch (e) {
-            grid.innerHTML = '';
-            empty.hidden = false;
-        }
-    }
-
-    /* ── Tabs ── */
-    function switchTab(tab) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-        document.getElementById('posPane').classList.toggle('hidden', tab !== 'menu');
-        document.getElementById('mgmtPane').classList.toggle('active', tab === 'mgmt');
-        document.getElementById('queuePane').classList.toggle('hidden', tab !== 'menu');
-        if (tab === 'mgmt') renderHistory();
-    }
-
-    /* ── Order ── */
-    function addItem(name, price) {
-        const existing = order.find(o => o.name === name && o.price === price);
-        if (existing) existing.qty++;
-        else order.push({ name, price, qty: 1 });
-        renderOrder();
-    }
-
-    function changeQty(idx, delta) {
-        order[idx].qty += delta;
-        if (order[idx].qty <= 0) order.splice(idx, 1);
-        renderOrder();
-    }
-
-    function clearOrder() { order = []; renderOrder(); }
-
-    function getTotal() { return order.reduce((s, o) => s + o.price * o.qty, 0); }
-
-    function renderOrder() {
-        const container = document.getElementById('orderItems');
-        const total = document.getElementById('orderTotal');
-        const hasItems = order.length > 0;
-
-        document.getElementById('btnCash').disabled = !hasItems;
-        document.getElementById('btnCard').disabled = !hasItems;
-        document.getElementById('btnQr').disabled = !hasItems;
-        total.textContent = fmt(getTotal());
-
-        if (!hasItems) {
-            container.innerHTML = '<div class="order-empty">메뉴를 선택해주세요</div>';
-            return;
-        }
-
-        container.innerHTML = '';
-        order.forEach((o, i) => {
-            const row = document.createElement('div');
-            row.className = 'order-item';
-            row.innerHTML = `
-                <div class="order-item-left">
-                    <span>${o.name}</span>
-                    <div class="order-item-qty">
-                        <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>
-                        <span class="qty-val">${o.qty}</span>
-                        <button class="qty-btn" onclick="changeQty(${i},1)">+</button>
-                    </div>
-                </div>
-                <span class="order-item-price">${fmt(o.price * o.qty)}</span>`;
-            container.appendChild(row);
-        });
-    }
-
-    /* ── Custom Input ── */
-    function openCustom() { document.getElementById('customOverlay').classList.add('show'); document.getElementById('customName').focus(); }
-    function closeCustom() {
-        document.getElementById('customOverlay').classList.remove('show');
-        document.getElementById('customName').value = '';
-        document.getElementById('customPrice').value = '';
-    }
-    function addCustom() {
-        const n = document.getElementById('customName').value.trim() || '기타';
-        const p = parseInt(document.getElementById('customPrice').value) || 0;
-        if (p <= 0) return;
-        addItem(n, p);
-        closeCustom();
-    }
-
-    /* ── Toast ── */
-    function showToast(msg) {
-        const t = document.getElementById('toast');
-        t.textContent = msg;
-        t.classList.remove('show');
-        void t.offsetWidth;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2000);
-    }
-
-    /* ── Sound ── */
-    function playSound(type) {
-        try {
-            const ac = new (window.AudioContext || window.webkitAudioContext)();
-            const o = ac.createOscillator();
-            const g = ac.createGain();
-            o.connect(g); g.connect(ac.destination);
-            o.frequency.value = type === 'success' ? 880 : 660;
-            g.gain.value = 0.1;
-            o.start(); o.stop(ac.currentTime + 0.12);
-            if (type === 'success') {
-                setTimeout(() => {
-                    const o2 = ac.createOscillator();
-                    const g2 = ac.createGain();
-                    o2.connect(g2); g2.connect(ac.destination);
-                    o2.frequency.value = 1320;
-                    g2.gain.value = 0.1;
-                    o2.start(); o2.stop(ac.currentTime + 0.18);
-                }, 120);
-            }
-        } catch (e) {}
-    }
-
-    /* ── Sales ── */
-    function updateSales() {
-        document.getElementById('dailyTotal').textContent = fmt(dailySales);
-        document.getElementById('dailyCount').textContent = dailyCount + '건';
-    }
-
-    function getMenuSummary() {
-        if (order.length === 1) return order[0].name + (order[0].qty > 1 ? ' x' + order[0].qty : '');
-        return order[0].name + ' 외 ' + (order.length - 1) + '건';
-    }
-
-    /* ── Payments ── */
-    function payCash() {
-        orderNum++;
-        const t = getTotal();
-        const summary = getMenuSummary();
-        slots.push({ id: orderNum, amount: t, menu: summary, status: 'paid', payType: '현금' });
-        dailySales += t; dailyCount++;
-        updateSales();
-        playSound('cash');
-        showToast('#' + orderNum + ' 현금 결제 완료 ' + fmt(t));
-        order = []; renderOrder(); renderSlots();
-    }
-
-    function payCard() {
-        orderNum++;
-        const t = getTotal();
-        const summary = getMenuSummary();
-        slots.push({ id: orderNum, amount: t, menu: summary, status: 'paid', payType: '카드' });
-        dailySales += t; dailyCount++;
-        updateSales();
-        playSound('cash');
-        showToast('#' + orderNum + ' 카드 결제 완료 ' + fmt(t));
-        order = []; renderOrder(); renderSlots();
-    }
-
-    function payQR() {
-        orderNum++;
-        const t = getTotal();
-        const summary = getMenuSummary();
-        const slot = { id: orderNum, amount: t, menu: summary, status: 'pending', payType: '간편결제', timer: 180 };
-        slots.push(slot);
-        currentQRSlotId = orderNum;
-        document.getElementById('qrOrderNum').textContent = '#' + orderNum;
-        document.getElementById('qrAmount').textContent = fmt(t);
-        document.getElementById('qrOverlay').classList.add('show');
-        order = []; renderOrder(); renderSlots();
-        startTimer(slot);
-    }
-
-    function startTimer(slot) {
-        const iv = setInterval(() => {
-            if (slot.status !== 'pending') { clearInterval(iv); return; }
-            slot.timer--;
-            if (slot.timer <= 0) { slot.status = 'expired'; clearInterval(iv); }
-            renderSlots();
-        }, 1000);
-    }
-
-    function closeQR() { document.getElementById('qrOverlay').classList.remove('show'); }
-
-    function simulatePay() {
-        closeQR();
-        const slot = slots.find(s => s.id === currentQRSlotId);
-        if (slot) {
-            slot.status = 'paid';
-            dailySales += slot.amount; dailyCount++;
-            updateSales();
-            playSound('success');
-            showToast('간편결제 완료 #' + slot.id + ' ' + fmt(slot.amount));
-            renderSlots();
-        }
-    }
-
-    function deliverSlot(id) {
-        const slot = slots.find(s => s.id === id);
-        if (slot) {
-            orderHistory.unshift({ id: slot.id, menu: slot.menu, amount: slot.amount, payType: slot.payType, status: '전달완료' });
-        }
-        slots = slots.filter(s => s.id !== id);
-        playSound('cash');
-        showToast('#' + id + ' 전달 완료');
-        renderSlots();
-        renderHistory();
-    }
-
-    function cancelSlot(id) {
-        const slot = slots.find(s => s.id === id);
-        if (slot && slot.status === 'paid') {
-            dailySales -= slot.amount; dailyCount--;
-            updateSales();
-            orderHistory.unshift({ id: slot.id, menu: slot.menu, amount: slot.amount, payType: slot.payType, status: '취소' });
-        }
-        slots = slots.filter(s => s.id !== id);
-        showToast('#' + id + ' 주문 취소');
-        renderSlots();
-        renderHistory();
-    }
-
-    /* ── Render History ── */
-    function renderHistory() {
-        const container = document.getElementById('orderHistory');
-        if (orderHistory.length === 0) {
-            container.innerHTML = '<div class="history-empty">아직 주문 내역이 없습니다</div>';
-            return;
-        }
-        container.innerHTML = '';
-        orderHistory.forEach(h => {
-            const row = document.createElement('div');
-            row.className = 'history-row';
-            const statusClass = h.status === '취소' ? 'cancelled' : 'delivered';
-            row.innerHTML = `
-                <div class="history-left">
-                    <span class="history-num">#${h.id}</span>
-                    <span class="history-menu">${h.menu}</span>
-                </div>
-                <div class="history-right">
-                    <span class="history-amount">${h.status === '취소' ? '-' : ''}${fmt(h.amount)}</span>
-                    <span class="history-pay">${h.payType}</span>
-                    <span class="history-status ${statusClass}">${h.status}</span>
-                </div>`;
-            container.appendChild(row);
-        });
-    }
-
-    /* ── Render Slots ── */
-    function renderSlots() {
-        const container = document.getElementById('slots');
-        const empty = document.getElementById('emptySlots');
-        const active = slots.filter(s => s.status !== 'expired');
-        empty.style.display = active.length > 0 ? 'none' : 'block';
-        container.innerHTML = '';
-
-        active.forEach(s => {
-            const isPaid = s.status === 'paid';
-            const div = document.createElement('div');
-            div.className = 'slot ' + (isPaid ? 'paid' : 'pending');
-
-            const color = isPaid ? 'var(--gray-800)' : '#c49000';
-            const payLabel = s.payType;
-
-            let bottom = '';
-            if (isPaid) {
-                bottom = `<div class="slot-actions">
-                    <button class="slot-act-btn deliver" onclick="deliverSlot(${s.id})">전달 완료</button>
-                    <button class="slot-act-btn cancel" onclick="cancelSlot(${s.id})">취소</button>
-                </div>`;
-            } else {
-                const min = Math.floor(s.timer / 60);
-                const sec = String(s.timer % 60).padStart(2, '0');
-                bottom = `<div class="slot-timer">${min}:${sec} 남음</div>`;
-            }
-
-            div.innerHTML = `
-                <div class="slot-top">
-                    <span class="slot-num" style="color:${color}">#${s.id}</span>
-                    <span class="slot-badge" style="color:${isPaid ? 'var(--blue-500)' : color}">${isPaid ? '결제 완료' : '결제 대기'}</span>
-                </div>
-                <div class="slot-mid">
-                    <span class="slot-menu" style="color:var(--gray-600)">${s.menu}</span>
-                    <span class="slot-pay-type" style="color:var(--gray-600)">${payLabel}</span>
-                </div>
-                <div class="slot-price" style="color:${color}">${fmt(s.amount)}</div>
-                ${bottom}`;
-            container.appendChild(div);
-        });
-    }
-
-    init();
-</script>
+<script src="/js/pos/index.js"></script>
 </body>
 </html>
