@@ -4,7 +4,8 @@ const state = {
     menus: [],
     cart: [],
     waitingOrders: [],
-    orderSubmitting: false
+    orderSubmitting: false,
+    selectedWaitingOrder: null
 };
 
 const formatPrice = (price) => new Intl.NumberFormat("ko-KR").format(price) + "원";
@@ -283,6 +284,14 @@ function createWaitingOrderSlot(order) {
     const slot = document.createElement("div");
     const isPaid = order.status === "PAID";
     slot.className = `slot ${isPaid ? "paid" : "pending"}`;
+    slot.tabIndex = 0;
+    slot.addEventListener("click", () => openOrderDetail(order));
+    slot.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openOrderDetail(order);
+        }
+    });
 
     const top = document.createElement("div");
     top.className = "slot-top";
@@ -316,6 +325,77 @@ function createWaitingOrderSlot(order) {
 
     slot.append(top, mid, price);
     return slot;
+}
+
+function openOrderDetail(order) {
+    state.selectedWaitingOrder = order;
+    document.getElementById("orderDetailTitle").textContent = `#${order.orderNumber} 주문 확인`;
+    document.getElementById("orderDetailStatus").textContent = order.status === "PAID" ? "결제 완료" : "결제 대기";
+    document.getElementById("orderDetailPayment").textContent = formatPaymentMethod(order.paymentMethod);
+    document.getElementById("orderDetailTotal").textContent = formatPrice(order.totalAmount ?? 0);
+    document.getElementById("orderDetailItems").replaceChildren(...createOrderDetailItemRows(order.items));
+    document.getElementById("orderDetailOverlay").classList.add("show");
+    document.getElementById("orderDetailOverlay").setAttribute("aria-hidden", "false");
+}
+
+function closeOrderDetail() {
+    state.selectedWaitingOrder = null;
+    document.getElementById("orderDetailOverlay").classList.remove("show");
+    document.getElementById("orderDetailOverlay").setAttribute("aria-hidden", "true");
+}
+
+async function completeSelectedWaitingOrder() {
+    if (!state.selectedWaitingOrder) {
+        return;
+    }
+
+    try {
+        await updateOrderStatus(state.selectedWaitingOrder.id, "DELIVERED");
+        closeOrderDetail();
+        await refreshWaitingOrders();
+        showToast("전달완료 처리되었습니다");
+    } catch {
+        showToast("전달완료 처리에 실패했습니다");
+    }
+}
+
+async function updateOrderStatus(orderId, status) {
+    const response = await fetch(`/api/v1/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({status})
+    });
+
+    if (response.status !== 204) {
+        throw new Error("Failed to update order status");
+    }
+}
+
+function createOrderDetailItemRows(items) {
+    if (!items || items.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "order-empty";
+        empty.textContent = "주문 항목이 없습니다";
+        return [empty];
+    }
+
+    return items.map((item) => {
+        const row = document.createElement("div");
+        row.className = "order-detail-item";
+
+        const name = document.createElement("span");
+        name.className = "order-detail-item-name";
+        name.textContent = item.menuName;
+
+        const quantity = document.createElement("span");
+        quantity.className = "order-detail-item-qty";
+        quantity.textContent = `${item.quantity}개`;
+
+        row.append(name, quantity);
+        return row;
+    });
 }
 
 function createOrderItemSummary(items) {
@@ -369,6 +449,9 @@ function bindEvents() {
     document.getElementById("btnCard").addEventListener("click", () => submitOfflinePayment("CARD"));
     document.getElementById("btnQr").addEventListener("click", submitEasyPay);
     document.getElementById("qrCloseButton").addEventListener("click", closeQrModal);
+    document.getElementById("orderDetailCloseButton").addEventListener("click", closeOrderDetail);
+    document.getElementById("orderDeliverButton").addEventListener("click", completeSelectedWaitingOrder);
+    document.getElementById("orderCancelButton").addEventListener("click", () => showToast("취소 처리는 다음 단계에서 연결합니다"));
 }
 
 document.addEventListener("DOMContentLoaded", () => {

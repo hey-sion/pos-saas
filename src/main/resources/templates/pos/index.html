@@ -306,7 +306,11 @@
             flex-direction: column;
             gap: 4px;
             margin-bottom: 8px;
+            cursor: pointer;
+            transition: transform 0.12s, box-shadow 0.12s;
         }
+        .slot:hover { box-shadow: var(--shadow-sm); }
+        .slot:active { transform: scale(0.98); }
         .slot.paid {
             background: #f0f4ff;
             border: 1px solid var(--gray-200);
@@ -448,6 +452,148 @@
         .qr-btn:hover { background: var(--gray-50); }
         .qr-btn.primary { background: var(--blue-500); border-color: var(--blue-500); color: var(--white); }
         .qr-btn.primary:hover { background: var(--blue-600); }
+
+        /* ── Order detail overlay ── */
+        .order-detail-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(2px);
+            z-index: 50;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 12vh;
+        }
+        .order-detail-overlay.show { display: flex; }
+        .order-detail-modal {
+            width: min(680px, calc(100vw - 32px));
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 64px 24px 64px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            position: relative;
+        }
+        .order-detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .order-detail-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+        .order-detail-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .order-detail-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+        .order-detail-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            font: inherit;
+            font-size: 20px;
+            line-height: 1;
+            color: var(--gray-400);
+            cursor: pointer;
+            z-index: 1;
+        }
+        .order-detail-close:hover {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+        .order-detail-btn {
+            height: 36px;
+            padding: 0 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-700);
+            cursor: pointer;
+        }
+        .order-detail-btn:hover { background: var(--gray-50); }
+        .order-detail-btn.primary {
+            background: #f0f4ff;
+            border-color: var(--gray-200);
+            color: var(--blue-500);
+        }
+        .order-detail-btn.primary:hover { background: var(--blue-50); }
+        .order-detail-btn.danger {
+            border-color: #ffc8c8;
+            color: var(--red-500);
+        }
+        .order-detail-btn.danger:hover { background: var(--red-50); }
+        .order-detail-meta {
+            display: flex;
+            gap: 8px;
+        }
+        .order-detail-badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 99px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+        .order-detail-items {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 14px 0;
+            border-top: 1px solid var(--gray-200);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .order-detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            font-size: 15px;
+            color: var(--gray-800);
+        }
+        .order-detail-item-name { font-weight: 700; }
+        .order-detail-item-qty {
+            min-width: 52px;
+            text-align: right;
+            font-weight: 700;
+            color: var(--gray-600);
+        }
+        .order-detail-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+        }
+        .order-detail-total .label {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--gray-800);
+        }
+        .order-detail-total .amount {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
 
         /* ── Custom input modal ── */
         .custom-overlay {
@@ -617,6 +763,30 @@
         <div class="qr-hint" id="qrHint">QR 생성 대기</div>
         <div class="qr-btns">
             <button class="qr-btn" id="qrCloseButton" type="button">닫기</button>
+        </div>
+    </div>
+</div>
+
+<div id="orderDetailOverlay" class="order-detail-overlay" aria-hidden="true">
+    <div class="order-detail-modal" role="dialog" aria-modal="true" aria-labelledby="orderDetailTitle">
+        <div class="order-detail-header">
+            <div class="order-detail-title-wrap">
+                <h2 class="order-detail-title" id="orderDetailTitle">주문 확인</h2>
+                <div class="order-detail-meta">
+                    <span class="order-detail-badge" id="orderDetailStatus">-</span>
+                    <span class="order-detail-badge" id="orderDetailPayment">-</span>
+                </div>
+            </div>
+            <button class="order-detail-close" id="orderDetailCloseButton" type="button" aria-label="닫기">×</button>
+            <div class="order-detail-actions">
+                <button class="order-detail-btn primary" id="orderDeliverButton" type="button">전달완료</button>
+                <button class="order-detail-btn danger" id="orderCancelButton" type="button">주문 취소</button>
+            </div>
+        </div>
+        <div class="order-detail-items" id="orderDetailItems"></div>
+        <div class="order-detail-total">
+            <span class="label">합계</span>
+            <span class="amount" id="orderDetailTotal">0원</span>
         </div>
     </div>
 </div>
