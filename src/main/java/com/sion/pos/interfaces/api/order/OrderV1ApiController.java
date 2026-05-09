@@ -1,12 +1,16 @@
 package com.sion.pos.interfaces.api.order;
 
 import com.sion.pos.application.order.OrderFacade;
+import com.sion.pos.application.order.OrderService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,10 +20,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderV1ApiController {
 
     private final OrderFacade orderFacade;
+    private final OrderService orderService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrderCreateResponse create(@Valid @RequestBody OrderCreateRequest request) {
         return OrderCreateResponse.from(orderFacade.create(request.toCommand()));
+    }
+
+    @GetMapping("/waiting")
+    public List<WaitingOrderResponse> getWaitingOrders(@RequestParam Long storeId) {
+        return orderService.getWaitingOrders(storeId).stream()
+                           .map(WaitingOrderResponse::from)
+                           .toList();
     }
 }

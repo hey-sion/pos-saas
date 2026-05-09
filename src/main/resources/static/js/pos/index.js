@@ -3,7 +3,8 @@ const STORE_ID = 1;
 const state = {
     menus: [],
     cart: [],
-    waitingOrders: []
+    waitingOrders: [],
+    orderSubmitting: false
 };
 
 const formatPrice = (price) => new Intl.NumberFormat("ko-KR").format(price) + "원";
@@ -123,9 +124,7 @@ function renderCart() {
     const hasItems = state.cart.length > 0;
 
     orderTotal.textContent = formatPrice(getCartTotal());
-    document.getElementById("btnCash").disabled = !hasItems;
-    document.getElementById("btnCard").disabled = !hasItems;
-    document.getElementById("btnQr").disabled = !hasItems;
+    updatePaymentButtons();
 
     if (!hasItems) {
         const empty = document.createElement("div");
@@ -136,6 +135,14 @@ function renderCart() {
     }
 
     orderItems.replaceChildren(...state.cart.map(createCartItemRow));
+}
+
+function updatePaymentButtons() {
+    const disabled = state.cart.length === 0 || state.orderSubmitting;
+
+    document.getElementById("btnCash").disabled = disabled;
+    document.getElementById("btnCard").disabled = disabled;
+    document.getElementById("btnQr").disabled = disabled;
 }
 
 function createCartItemRow(item) {
@@ -183,12 +190,43 @@ async function submitOfflinePayment(method) {
         return;
     }
 
-    showToast("주문 생성 API 연결 대기");
+    state.orderSubmitting = true;
+    updatePaymentButtons();
 
-    // TODO: POST /api/orders 연동 후 서버 응답 기준으로 cart 리셋 및 대기열 갱신
-    // await createOrder({method, channel: "OFFLINE"});
-    // clearCart();
-    // await refreshWaitingOrders();
+    try {
+        await createOrder(method);
+        clearCart();
+        await refreshWaitingOrders();
+        showToast("주문이 생성되었습니다");
+    } catch {
+        showToast("주문 생성에 실패했습니다");
+    } finally {
+        state.orderSubmitting = false;
+        updatePaymentButtons();
+    }
+}
+
+async function createOrder(method) {
+    const response = await fetch("/api/v1/orders", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            storeId: STORE_ID,
+            items: state.cart.map((item) => ({
+                menuId: item.menuId,
+                quantity: item.quantity
+            })),
+            method
+        })
+    });
+
+    if (response.status !== 201) {
+        throw new Error("Failed to create order");
+    }
+
+    return response.json();
 }
 
 async function submitEasyPay() {
@@ -198,7 +236,7 @@ async function submitEasyPay() {
 
     openQrModal(getCartTotal());
 
-    // TODO: POST /api/orders/simple-pay 연동 후 QR URL을 표시하고 대기열을 갱신
+    // TODO: POST /api/v1/orders/simple-pay 연동 후 QR URL을 표시하고 대기열을 갱신
     // const qr = await createEasyPayOrder();
     // updateQrModal(qr);
     // clearCart();
@@ -219,7 +257,7 @@ function closeQrModal() {
 
 async function refreshWaitingOrders() {
     try {
-        const response = await fetch(`/api/orders/waiting?storeId=${STORE_ID}`);
+        const response = await fetch(`/api/v1/orders/waiting?storeId=${STORE_ID}`);
 
         if (!response.ok) {
             throw new Error("Failed to load waiting orders");
@@ -264,11 +302,11 @@ function createWaitingOrderSlot(order) {
 
     const menu = document.createElement("span");
     menu.className = "slot-menu";
-    menu.textContent = order.summary ?? "-";
+    menu.textContent = createOrderItemSummary(order.items);
 
     const payType = document.createElement("span");
     payType.className = "slot-pay-type";
-    payType.textContent = order.paymentMethod ?? "-";
+    payType.textContent = formatPaymentMethod(order.paymentMethod);
 
     mid.append(menu, payType);
 
@@ -278,6 +316,27 @@ function createWaitingOrderSlot(order) {
 
     slot.append(top, mid, price);
     return slot;
+}
+
+function createOrderItemSummary(items) {
+    if (!items || items.length === 0) {
+        return "-";
+    }
+
+    const first = items[0];
+    if (items.length === 1) {
+        return `${first.menuName} ${first.quantity}개`;
+    }
+    return `${first.menuName} 외 ${items.length - 1}건`;
+}
+
+function formatPaymentMethod(method) {
+    const labels = {
+        CASH: "현금",
+        CARD: "카드",
+        EASY_PAY: "간편결제"
+    };
+    return labels[method] ?? "-";
 }
 
 function showToast(message) {
