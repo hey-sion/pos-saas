@@ -90,6 +90,48 @@ class OrderTest {
 
             expects(ErrorType.CONFLICT, order::deliver);
         }
+
+        @Test
+        @DisplayName("이미 CANCELLED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenAlreadyCancelled() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+            order.cancel();
+
+            expects(ErrorType.CONFLICT, order::deliver);
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 취소 처리 시, ")
+    class Cancel {
+
+        @Test
+        @DisplayName("RECEIVED 상태에서 호출하면 CANCELLED로 상태가 변경된다")
+        void transitionsReceivedToCancelled() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+
+            order.cancel();
+
+            assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED);
+        }
+
+        @Test
+        @DisplayName("이미 DELIVERED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenAlreadyDelivered() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+            order.deliver();
+
+            expects(ErrorType.CONFLICT, order::cancel);
+        }
+
+        @Test
+        @DisplayName("이미 CANCELLED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenAlreadyCancelled() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+            order.cancel();
+
+            expects(ErrorType.CONFLICT, order::cancel);
+        }
     }
 
     private static void expects(ErrorType expected, ThrowingCallable callable) {

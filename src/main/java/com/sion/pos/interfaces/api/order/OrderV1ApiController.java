@@ -7,6 +7,8 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +28,15 @@ public class OrderV1ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public OrderCreateResponse create(@Valid @RequestBody OrderCreateRequest request) {
         return OrderCreateResponse.from(orderFacade.create(request.toCommand()));
+    }
+
+    @PatchMapping("/{orderId}/status")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateStatus(
+            @PathVariable Long orderId,
+            @Valid @RequestBody OrderStatusUpdateRequest request
+    ) {
+        orderService.updateStatus(orderId, request.status());
     }
 
     @GetMapping("/waiting")

@@ -6,6 +6,8 @@ import com.sion.pos.domain.order.OrderItemRepository;
 import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.domain.payment.PaymentRepository;
+import com.sion.pos.support.error.ErrorType;
+import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +23,18 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
+
+    @Transactional
+    public void updateStatus(Long orderId, Order.Status status) {
+        Order order = orderRepository.findById(orderId)
+                                     .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+
+        switch (status) {
+            case DELIVERED -> order.deliver();
+            case CANCELLED -> order.cancel();
+            case RECEIVED -> throw new PosApplicationException(ErrorType.BAD_REQUEST, "변경할 수 없는 주문 상태입니다.");
+        }
+    }
 
     @Transactional(readOnly = true)
     public List<WaitingOrderInfo> getWaitingOrders(Long storeId) {

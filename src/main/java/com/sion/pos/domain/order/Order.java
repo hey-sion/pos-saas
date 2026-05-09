@@ -72,6 +72,14 @@ public class Order extends BaseEntity {
         this.status = Status.DELIVERED;
     }
 
+    public void cancel() {
+        if (this.status != Status.RECEIVED) {
+            throw new PosApplicationException(ErrorType.CONFLICT, "주문 접수 상태에서만 취소 처리 가능합니다. 현재 상태: " + this.status);
+        }
+
+        this.status = Status.CANCELLED;
+    }
+
     public enum Status {
         RECEIVED,
         DELIVERED,
