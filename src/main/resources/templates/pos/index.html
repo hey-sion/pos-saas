@@ -73,6 +73,8 @@
             gap: 4px;
         }
         .tab {
+            display: inline-flex;
+            align-items: center;
             padding: 8px 16px;
             border-radius: 8px;
             border: none;
@@ -82,6 +84,7 @@
             font-weight: 600;
             color: var(--gray-500);
             cursor: pointer;
+            text-decoration: none;
             transition: all 0.15s;
         }
         .tab:hover { color: var(--gray-700); background: var(--gray-100); }
@@ -666,93 +669,6 @@
         .custom-btn.primary { background: var(--blue-500); border-color: var(--blue-500); color: var(--white); }
         .custom-btn.primary:hover { background: var(--blue-600); }
 
-        /* ── Management Tab ── */
-        .mgmt-pane {
-            display: none;
-            padding: 24px;
-            overflow-y: auto;
-        }
-        .mgmt-pane.active { display: block; grid-column: 1 / -1; }
-        .mgmt-content { max-width: 640px; }
-        .mgmt-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-        .mgmt-title { font-size: 20px; font-weight: 800; color: var(--gray-900); }
-        .mgmt-section-label {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--gray-600);
-            margin-bottom: 10px;
-        }
-        .order-history {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .history-empty {
-            font-size: 13px;
-            color: var(--gray-400);
-            text-align: center;
-            padding: 40px 0;
-        }
-        .history-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 14px;
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: var(--radius-sm);
-        }
-        .history-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .history-num {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--gray-800);
-            min-width: 36px;
-        }
-        .history-menu {
-            font-size: 13px;
-            color: var(--gray-600);
-        }
-        .history-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-align: right;
-        }
-        .history-amount {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--gray-800);
-        }
-        .history-pay {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 2px 8px;
-            border-radius: 99px;
-            background: var(--gray-100);
-            color: var(--gray-600);
-        }
-        .history-status {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 2px 8px;
-            border-radius: 99px;
-        }
-        .history-status.delivered { background: var(--green-50); color: var(--green-600); }
-        .history-status.cancelled { background: var(--red-50); color: var(--red-500); }
-
-        /* Hide/show */
-        .pos-pane.hidden, .queue-pane.hidden { display: none; }
-
         @media (max-width: 760px) {
             .main { grid-template-columns: 1fr; }
             .queue-pane { border-left: 0; border-top: 1px solid var(--gray-200); }
@@ -825,8 +741,8 @@
     <div class="header-left">
         <span class="logo">POS</span>
         <nav class="tabs">
-            <button class="tab active" data-tab="menu">메뉴</button>
-            <button class="tab" data-tab="mgmt">관리</button>
+            <a class="tab active" href="/pos">메뉴</a>
+            <a class="tab" href="/pos/manage">관리</a>
         </nav>
     </div>
     <div class="header-right">
@@ -857,23 +773,6 @@
                 <button class="pay-btn" id="btnCash" disabled>현금</button>
                 <button class="pay-btn" id="btnCard" disabled>카드 단말기</button>
                 <button class="pay-btn qr" id="btnQr" disabled>간편결제</button>
-            </div>
-        </div>
-    </section>
-
-    <section class="mgmt-pane" id="mgmtPane">
-        <div class="mgmt-content">
-            <div class="mgmt-top">
-                <h2 class="mgmt-title">판매 관리</h2>
-            </div>
-            <div class="daily-summary" style="margin-bottom:20px">
-                <div class="daily-label">오늘의 매출</div>
-                <div class="daily-amount" id="dailyTotal">0원</div>
-                <div class="daily-count" id="dailyCount">0건</div>
-            </div>
-            <div class="mgmt-section-label">주문 내역</div>
-            <div class="order-history" id="orderHistory">
-                <div class="history-empty">아직 주문 내역이 없습니다</div>
             </div>
         </div>
     </section>

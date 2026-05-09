@@ -453,21 +453,7 @@ function showToast(message) {
     setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
-function switchTab(tab) {
-    document.querySelectorAll(".tab").forEach((button) => {
-        button.classList.toggle("active", button.dataset.tab === tab);
-    });
-
-    document.getElementById("posPane").classList.toggle("hidden", tab !== "menu");
-    document.getElementById("queuePane").classList.toggle("hidden", tab !== "menu");
-    document.getElementById("mgmtPane").classList.toggle("active", tab === "mgmt");
-}
-
 function bindEvents() {
-    document.querySelectorAll(".tab").forEach((button) => {
-        button.addEventListener("click", () => switchTab(button.dataset.tab));
-    });
-
     document.querySelector(".clear-btn").addEventListener("click", clearCart);
     document.getElementById("btnCash").addEventListener("click", () => submitOfflinePayment("CASH"));
     document.getElementById("btnCard").addEventListener("click", () => submitOfflinePayment("CARD"));

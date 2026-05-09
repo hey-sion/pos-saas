@@ -10,4 +10,9 @@ public class PosPageController {
     public String pos() {
         return "pos/index";
     }
+
+    @GetMapping("/pos/manage")
+    public String manage() {
+        return "pos/manage";
+    }
 }
