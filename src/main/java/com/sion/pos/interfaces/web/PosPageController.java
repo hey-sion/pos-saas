@@ -10,10 +10,4 @@ public class PosPageController {
     public String pos() {
         return "pos/index";
     }
-
-    // TODO 개발용 목업 확인 경로, 운영 배포 전 삭제
-    @GetMapping("/pos/test")
-    public String posTest() {
-        return "pos/index_test";
-    }
 }
