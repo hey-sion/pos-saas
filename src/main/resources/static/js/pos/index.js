@@ -334,6 +334,7 @@ function openOrderDetail(order) {
     document.getElementById("orderDetailPayment").textContent = formatPaymentMethod(order.paymentMethod);
     document.getElementById("orderDetailTotal").textContent = formatPrice(order.totalAmount ?? 0);
     document.getElementById("orderDetailItems").replaceChildren(...createOrderDetailItemRows(order.items));
+    hideCancelConfirmation();
     document.getElementById("orderDetailOverlay").classList.add("show");
     document.getElementById("orderDetailOverlay").setAttribute("aria-hidden", "false");
 }
@@ -342,6 +343,14 @@ function closeOrderDetail() {
     state.selectedWaitingOrder = null;
     document.getElementById("orderDetailOverlay").classList.remove("show");
     document.getElementById("orderDetailOverlay").setAttribute("aria-hidden", "true");
+}
+
+function showCancelConfirmation() {
+    document.getElementById("orderCancelConfirm").classList.add("show");
+}
+
+function hideCancelConfirmation() {
+    document.getElementById("orderCancelConfirm").classList.remove("show");
 }
 
 async function completeSelectedWaitingOrder() {
@@ -356,6 +365,21 @@ async function completeSelectedWaitingOrder() {
         showToast("전달완료 처리되었습니다");
     } catch {
         showToast("전달완료 처리에 실패했습니다");
+    }
+}
+
+async function cancelSelectedWaitingOrder() {
+    if (!state.selectedWaitingOrder) {
+        return;
+    }
+
+    try {
+        await updateOrderStatus(state.selectedWaitingOrder.id, "CANCELLED");
+        closeOrderDetail();
+        await refreshWaitingOrders();
+        showToast("주문이 취소되었습니다");
+    } catch {
+        showToast("주문 취소에 실패했습니다");
     }
 }
 
@@ -451,7 +475,9 @@ function bindEvents() {
     document.getElementById("qrCloseButton").addEventListener("click", closeQrModal);
     document.getElementById("orderDetailCloseButton").addEventListener("click", closeOrderDetail);
     document.getElementById("orderDeliverButton").addEventListener("click", completeSelectedWaitingOrder);
-    document.getElementById("orderCancelButton").addEventListener("click", () => showToast("취소 처리는 다음 단계에서 연결합니다"));
+    document.getElementById("orderCancelButton").addEventListener("click", showCancelConfirmation);
+    document.getElementById("orderCancelDismissButton").addEventListener("click", hideCancelConfirmation);
+    document.getElementById("orderCancelConfirmButton").addEventListener("click", cancelSelectedWaitingOrder);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

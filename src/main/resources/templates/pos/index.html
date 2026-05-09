@@ -594,6 +594,29 @@
             font-weight: 800;
             color: var(--gray-900);
         }
+        .order-cancel-confirm {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 12px;
+            border: 1px solid #ffc8c8;
+            border-radius: var(--radius-sm);
+            background: var(--red-50);
+        }
+        .order-cancel-confirm.show { display: flex; }
+        .order-cancel-message {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-800);
+        }
+        .order-cancel-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
 
         /* ── Custom input modal ── */
         .custom-overlay {
@@ -787,6 +810,13 @@
         <div class="order-detail-total">
             <span class="label">합계</span>
             <span class="amount" id="orderDetailTotal">0원</span>
+        </div>
+        <div class="order-cancel-confirm" id="orderCancelConfirm">
+            <span class="order-cancel-message">해당 주문을 취소하시겠습니까?</span>
+            <div class="order-cancel-actions">
+                <button class="order-detail-btn" id="orderCancelDismissButton" type="button">아니오</button>
+                <button class="order-detail-btn danger" id="orderCancelConfirmButton" type="button">주문 취소</button>
+            </div>
         </div>
     </div>
 </div>
