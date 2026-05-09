@@ -57,7 +57,7 @@ CREATE TABLE payment (
     method VARCHAR(20) NOT NULL,
     channel VARCHAR(20) NOT NULL,
     amount INT NOT NULL,
-    pg_order_code VARCHAR(100),
+    pg_payment_id VARCHAR(100),
     pg_transaction_key VARCHAR(100),
     provider VARCHAR(30),
     status VARCHAR(20) NOT NULL,

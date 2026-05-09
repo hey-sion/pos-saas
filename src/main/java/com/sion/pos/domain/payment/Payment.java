@@ -33,8 +33,8 @@ public class Payment extends BaseEntity {
     @Column(nullable = false)
     private Integer amount;
 
-    @Column(name = "pg_order_code", length = 100)
-    private String pgOrderCode;
+    @Column(name = "pg_payment_id", length = 100)
+    private String pgPaymentId;
 
     @Column(name = "pg_transaction_key", length = 100)
     private String pgTransactionKey;
