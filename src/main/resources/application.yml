@@ -20,6 +20,11 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+portone:
+  store-id: ${PORTONE_STORE_ID:store-test}
+  channel-keys:
+    KAKAO_PAY: ${PORTONE_CHANNEL_KEY_KAKAO_PAY:channel-key-test-kakao}
+
 logging:
   level:
     org.hibernate.SQL: debug

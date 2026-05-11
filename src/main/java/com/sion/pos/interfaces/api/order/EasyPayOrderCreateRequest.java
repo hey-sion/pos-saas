@@ -1,6 +1,6 @@
 package com.sion.pos.interfaces.api.order;
 
-import com.sion.pos.application.order.OfflineOrderCreateCommand;
+import com.sion.pos.application.order.EasyPayOrderCreateCommand;
 import com.sion.pos.domain.payment.Payment;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 
-public record OrderCreateRequest(
+public record EasyPayOrderCreateRequest(
         @NotNull(message = "storeId는 필수입니다.")
         @Positive(message = "storeId는 1 이상이어야 합니다.")
         Long storeId,
@@ -16,17 +16,17 @@ public record OrderCreateRequest(
         @NotEmpty(message = "주문 항목이 비어 있습니다.")
         List<@Valid Line> items,
 
-        @NotNull(message = "method는 필수입니다.")
-        Payment.Method method
+        @NotNull(message = "provider는 필수입니다.")
+        Payment.Provider provider
 ) {
 
-    public OfflineOrderCreateCommand toCommand() {
-        return new OfflineOrderCreateCommand(
+    public EasyPayOrderCreateCommand toCommand() {
+        return new EasyPayOrderCreateCommand(
                 storeId,
                 items.stream()
                      .map(Line::toCommand)
                      .toList(),
-                method
+                provider
         );
     }
 
@@ -40,8 +40,8 @@ public record OrderCreateRequest(
             Integer quantity
     ) {
 
-        private OfflineOrderCreateCommand.Line toCommand() {
-            return new OfflineOrderCreateCommand.Line(menuId, quantity);
+        private EasyPayOrderCreateCommand.Line toCommand() {
+            return new EasyPayOrderCreateCommand.Line(menuId, quantity);
         }
     }
 }

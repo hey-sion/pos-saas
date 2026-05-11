@@ -53,36 +53,47 @@ public class Payment extends BaseEntity {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
-    public static Payment create(Long orderId, Method method, Channel channel, Integer amount, LocalDateTime paidAt) {
-        if (orderId == null || orderId <= 0) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "orderId는 1 이상이어야 합니다.");
-        }
+    public static Payment createOffline(Long orderId, Method method, Integer amount, LocalDateTime paidAt) {
+        validateCommon(orderId, amount);
 
         if (method == null) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "method는 필수입니다.");
         }
-
-        if (channel == null) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "channel은 필수입니다.");
+        if (method == Method.EASY_PAY) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "오프라인 결제는 EASY_PAY를 사용할 수 없습니다.");
         }
-
-        if (amount == null || amount <= 0) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "amount는 1 이상이어야 합니다.");
+        if (paidAt == null) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "오프라인 결제는 paidAt이 필수입니다.");
         }
 
         Payment payment = new Payment();
         payment.orderId = orderId;
         payment.method = method;
-        payment.channel = channel;
+        payment.channel = Channel.OFFLINE;
         payment.amount = amount;
+        payment.status = Status.COMPLETED;
+        payment.paidAt = paidAt;
+        return payment;
+    }
 
-        if (paidAt != null) {
-            payment.status = Status.COMPLETED;
-            payment.paidAt = paidAt;
-        } else {
-            payment.status = Status.PENDING;
+    public static Payment createPg(Long orderId, Provider provider, Integer amount, String pgPaymentId) {
+        validateCommon(orderId, amount);
+
+        if (provider == null) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "provider는 필수입니다.");
+        }
+        if (pgPaymentId == null || pgPaymentId.isBlank()) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "pgPaymentId는 필수입니다.");
         }
 
+        Payment payment = new Payment();
+        payment.orderId = orderId;
+        payment.method = Method.EASY_PAY;
+        payment.channel = Channel.PG;
+        payment.amount = amount;
+        payment.provider = provider;
+        payment.pgPaymentId = pgPaymentId;
+        payment.status = Status.PENDING;
         return payment;
     }
 
@@ -110,6 +121,15 @@ public class Payment extends BaseEntity {
         this.failReason = reason;
     }
 
+    private static void validateCommon(Long orderId, Integer amount) {
+        if (orderId == null || orderId <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "orderId는 1 이상이어야 합니다.");
+        }
+        if (amount == null || amount <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "amount는 1 이상이어야 합니다.");
+        }
+    }
+
     public enum Status {
         PENDING,
         COMPLETED,
@@ -128,8 +148,12 @@ public class Payment extends BaseEntity {
     }
 
     public enum Provider {
-        KAKAO_PAY,
-        NAVER_PAY,
-        TOSS_PAY
+        KAKAO_PAY;
+
+        public String toPortOneCode() {
+            return switch (this) {
+                case KAKAO_PAY -> "KAKAOPAY";
+            };
+        }
     }
 }

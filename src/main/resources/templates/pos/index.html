@@ -259,7 +259,7 @@
         /* Payment buttons */
         .pay-row {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
             margin-top: 12px;
         }
@@ -278,13 +278,9 @@
         .pay-btn:hover { background: var(--gray-50); border-color: var(--gray-300); }
         .pay-btn:active { transform: scale(0.97); }
         .pay-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
-        .pay-btn.qr {
-            background: var(--blue-500);
-            border-color: var(--blue-500);
-            color: var(--white);
-        }
-        .pay-btn.qr:hover { background: var(--blue-600); }
-        .pay-btn.qr:disabled { background: var(--blue-500); opacity: 0.35; }
+        .pay-btn.kakao { background: #fee500; border-color: #e6cf00; color: #191919; }
+        .pay-btn.kakao:hover { background: #f7dc00; }
+        .pay-btn.kakao:disabled { opacity: 0.35; }
 
         /* ── Right: Customer Queue ── */
         .queue-pane {
@@ -453,8 +449,10 @@
             cursor: pointer;
         }
         .qr-btn:hover { background: var(--gray-50); }
+        .qr-btn:disabled { opacity: 0.45; cursor: default; }
         .qr-btn.primary { background: var(--blue-500); border-color: var(--blue-500); color: var(--white); }
         .qr-btn.primary:hover { background: var(--blue-600); }
+        .qr-btn.primary:disabled { background: var(--blue-500); }
 
         /* ── Order detail overlay ── */
         .order-detail-overlay {
@@ -701,6 +699,7 @@
         </div>
         <div class="qr-hint" id="qrHint">QR 생성 대기</div>
         <div class="qr-btns">
+            <button class="qr-btn primary" id="qrAcceptButton" type="button">결제 접수</button>
             <button class="qr-btn" id="qrCloseButton" type="button">닫기</button>
         </div>
     </div>
@@ -772,7 +771,7 @@
             <div class="pay-row">
                 <button class="pay-btn" id="btnCash" disabled>현금</button>
                 <button class="pay-btn" id="btnCard" disabled>카드 단말기</button>
-                <button class="pay-btn qr" id="btnQr" disabled>간편결제</button>
+                <button class="pay-btn kakao" id="btnKakaoPay" disabled>카카오페이</button>
             </div>
         </div>
     </section>

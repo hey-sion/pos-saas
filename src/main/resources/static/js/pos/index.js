@@ -1,11 +1,30 @@
 const STORE_ID = 1;
 
+const PAYMENT_OPTIONS = {
+    CASH: {
+        method: "CASH",
+        provider: null,
+        label: "현금"
+    },
+    CARD: {
+        method: "CARD",
+        provider: null,
+        label: "카드 단말기"
+    },
+    KAKAO_PAY: {
+        method: "EASY_PAY",
+        provider: "KAKAO_PAY",
+        label: "카카오페이"
+    }
+};
+
 const state = {
     menus: [],
     cart: [],
     waitingOrders: [],
     orderSubmitting: false,
-    selectedWaitingOrder: null
+    selectedWaitingOrder: null,
+    selectedEasyPayOption: null
 };
 
 const formatPrice = (price) => new Intl.NumberFormat("ko-KR").format(price) + "원";
@@ -143,7 +162,7 @@ function updatePaymentButtons() {
 
     document.getElementById("btnCash").disabled = disabled;
     document.getElementById("btnCard").disabled = disabled;
-    document.getElementById("btnQr").disabled = disabled;
+    document.getElementById("btnKakaoPay").disabled = disabled;
 }
 
 function createCartItemRow(item) {
@@ -186,7 +205,7 @@ function createCartItemRow(item) {
     return row;
 }
 
-async function submitOfflinePayment(method) {
+async function submitCompletedPayment(paymentOption) {
     if (state.cart.length === 0) {
         return;
     }
@@ -195,7 +214,7 @@ async function submitOfflinePayment(method) {
     updatePaymentButtons();
 
     try {
-        await createOrder(method);
+        await createOrder(paymentOption);
         clearCart();
         await refreshWaitingOrders();
         showToast("주문이 생성되었습니다");
@@ -207,20 +226,26 @@ async function submitOfflinePayment(method) {
     }
 }
 
-async function createOrder(method) {
+async function createOrder(paymentOption) {
+    const payload = {
+        storeId: STORE_ID,
+        items: state.cart.map((item) => ({
+            menuId: item.menuId,
+            quantity: item.quantity
+        })),
+        method: paymentOption.method
+    };
+
+    if (paymentOption.provider) {
+        payload.provider = paymentOption.provider;
+    }
+
     const response = await fetch("/api/v1/orders", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-            storeId: STORE_ID,
-            items: state.cart.map((item) => ({
-                menuId: item.menuId,
-                quantity: item.quantity
-            })),
-            method
-        })
+        body: JSON.stringify(payload)
     });
 
     if (response.status !== 201) {
@@ -230,28 +255,54 @@ async function createOrder(method) {
     return response.json();
 }
 
-async function submitEasyPay() {
+function submitEasyPay(paymentOption) {
     if (state.cart.length === 0) {
         return;
     }
 
-    openQrModal(getCartTotal());
-
-    // TODO: POST /api/v1/orders/simple-pay 연동 후 QR URL을 표시하고 대기열을 갱신
-    // const qr = await createEasyPayOrder();
-    // updateQrModal(qr);
-    // clearCart();
-    // await refreshWaitingOrders();
+    openQrModal(paymentOption);
 }
 
-function openQrModal(amount) {
-    document.getElementById("qrAmount").textContent = formatPrice(amount);
-    document.getElementById("qrHint").textContent = "QR 생성 대기";
+async function acceptEasyPayPayment() {
+    if (!state.selectedEasyPayOption || state.cart.length === 0 || state.orderSubmitting) {
+        return;
+    }
+
+    state.orderSubmitting = true;
+    updatePaymentButtons();
+    document.getElementById("qrAcceptButton").disabled = true;
+
+    try {
+        await createOrder(state.selectedEasyPayOption);
+        closeQrModal(true);
+        clearCart();
+        await refreshWaitingOrders();
+        showToast("결제 대기 주문이 생성되었습니다");
+    } catch {
+        showToast("결제 접수에 실패했습니다");
+    } finally {
+        state.orderSubmitting = false;
+        updatePaymentButtons();
+        document.getElementById("qrAcceptButton").disabled = false;
+    }
+}
+
+function openQrModal(paymentOption) {
+    state.selectedEasyPayOption = paymentOption;
+    document.getElementById("qrTitle").textContent = `${paymentOption.label} 결제`;
+    document.getElementById("qrAmount").textContent = formatPrice(getCartTotal());
+    document.getElementById("qrHint").textContent = "고객이 QR을 스캔하면 결제 접수를 눌러주세요";
+    document.getElementById("qrAcceptButton").disabled = false;
     document.getElementById("qrOverlay").classList.add("show");
     document.getElementById("qrOverlay").setAttribute("aria-hidden", "false");
 }
 
-function closeQrModal() {
+function closeQrModal(force = false) {
+    if (force !== true && state.orderSubmitting) {
+        return;
+    }
+
+    state.selectedEasyPayOption = null;
     document.getElementById("qrOverlay").classList.remove("show");
     document.getElementById("qrOverlay").setAttribute("aria-hidden", "true");
 }
@@ -455,9 +506,10 @@ function showToast(message) {
 
 function bindEvents() {
     document.querySelector(".clear-btn").addEventListener("click", clearCart);
-    document.getElementById("btnCash").addEventListener("click", () => submitOfflinePayment("CASH"));
-    document.getElementById("btnCard").addEventListener("click", () => submitOfflinePayment("CARD"));
-    document.getElementById("btnQr").addEventListener("click", submitEasyPay);
+    document.getElementById("btnCash").addEventListener("click", () => submitCompletedPayment(PAYMENT_OPTIONS.CASH));
+    document.getElementById("btnCard").addEventListener("click", () => submitCompletedPayment(PAYMENT_OPTIONS.CARD));
+    document.getElementById("btnKakaoPay").addEventListener("click", () => submitEasyPay(PAYMENT_OPTIONS.KAKAO_PAY));
+    document.getElementById("qrAcceptButton").addEventListener("click", acceptEasyPayPayment);
     document.getElementById("qrCloseButton").addEventListener("click", closeQrModal);
     document.getElementById("orderDetailCloseButton").addEventListener("click", closeOrderDetail);
     document.getElementById("orderDeliverButton").addEventListener("click", completeSelectedWaitingOrder);

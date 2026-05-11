@@ -152,6 +152,92 @@ class OrderV1ApiE2ETest {
     }
 
     @Nested
+    @DisplayName("간편결제 주문 생성 시, ")
+    class CreateEasyPay {
+
+        private static final String EASY_PAY_ENDPOINT = "/api/v1/orders/easy-pay";
+
+        @Test
+        @DisplayName("유효한 요청이면, 201 Created와 PG 결제 정보를 반환한다.")
+        void returnsCreated_whenValidRequest() {
+            EasyPayOrderCreateRequest request = new EasyPayOrderCreateRequest(
+                    storeId,
+                    List.of(
+                            new EasyPayOrderCreateRequest.Line(americanoId, 1),
+                            new EasyPayOrderCreateRequest.Line(latteId, 2)
+                    ),
+                    Payment.Provider.KAKAO_PAY
+            );
+
+            ResponseEntity<EasyPayOrderCreateResponse> response =
+                    testRestTemplate.exchange(EASY_PAY_ENDPOINT, HttpMethod.POST,
+                            new HttpEntity<>(request), EasyPayOrderCreateResponse.class);
+
+            EasyPayOrderCreateResponse body = response.getBody();
+            Long orderId = body.order().id();
+            Order order = orderRepository.findById(orderId).orElseThrow();
+            Payment payment = paymentRepository.findById(body.payment().id()).orElseThrow();
+
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
+                    () -> assertThat(body.order().orderNumber()).isEqualTo(1),
+                    () -> assertThat(body.order().totalAmount()).isEqualTo(AMERICANO_PRICE + LATTE_PRICE * 2),
+                    () -> assertThat(body.payment().pgPaymentId()).isNotBlank(),
+                    () -> assertThat(body.portOne().payMethod()).isEqualTo("EASY_PAY"),
+                    () -> assertThat(body.portOne().easyPay().easyPayProvider()).isEqualTo("KAKAOPAY"),
+                    () -> assertThat(body.portOne().paymentId()).isEqualTo(body.payment().pgPaymentId()),
+                    () -> assertThat(body.portOne().totalAmount()).isEqualTo(body.order().totalAmount()),
+                    () -> assertThat(body.portOne().orderName()).isEqualTo("아메리카노 외 1건"),
+                    () -> assertThat(body.portOne().storeId()).isNotBlank(),
+                    () -> assertThat(body.portOne().channelKey()).isNotBlank(),
+                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED),
+                    () -> assertThat(payment.getStatus()).isEqualTo(Payment.Status.PENDING),
+                    () -> assertThat(payment.getMethod()).isEqualTo(Payment.Method.EASY_PAY),
+                    () -> assertThat(payment.getChannel()).isEqualTo(Payment.Channel.PG),
+                    () -> assertThat(payment.getProvider()).isEqualTo(Payment.Provider.KAKAO_PAY),
+                    () -> assertThat(payment.getPaidAt()).isNull()
+            );
+
+            List<OrderItem> items = orderItemRepository.findAll().stream()
+                                                       .filter(item -> item.getOrderId().equals(orderId))
+                                                       .toList();
+            assertThat(items).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("provider가 누락되면, 400 Bad Request를 반환한다.")
+        void returnsBadRequest_whenProviderIsNull() {
+            EasyPayOrderCreateRequest request = new EasyPayOrderCreateRequest(
+                    storeId,
+                    List.of(new EasyPayOrderCreateRequest.Line(americanoId, 1)),
+                    null
+            );
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(EASY_PAY_ENDPOINT, HttpMethod.POST,
+                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @Test
+        @DisplayName("주문 항목이 비어 있으면, 400 Bad Request를 반환한다.")
+        void returnsBadRequest_whenItemsAreEmpty() {
+            EasyPayOrderCreateRequest request = new EasyPayOrderCreateRequest(
+                    storeId,
+                    List.of(),
+                    Payment.Provider.KAKAO_PAY
+            );
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(EASY_PAY_ENDPOINT, HttpMethod.POST,
+                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Nested
     @DisplayName("주문 상태 변경 시, ")
     class UpdateStatus {
 
