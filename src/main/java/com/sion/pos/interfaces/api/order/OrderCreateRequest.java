@@ -1,7 +1,6 @@
 package com.sion.pos.interfaces.api.order;
 
-import com.sion.pos.application.order.OfflineOrderCreateCommand;
-import com.sion.pos.domain.payment.Payment;
+import com.sion.pos.application.order.OrderCreateCommand;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -14,19 +13,15 @@ public record OrderCreateRequest(
         Long storeId,
 
         @NotEmpty(message = "주문 항목이 비어 있습니다.")
-        List<@Valid Line> items,
-
-        @NotNull(message = "method는 필수입니다.")
-        Payment.Method method
+        List<@Valid Line> items
 ) {
 
-    public OfflineOrderCreateCommand toCommand() {
-        return new OfflineOrderCreateCommand(
+    public OrderCreateCommand toCommand() {
+        return new OrderCreateCommand(
                 storeId,
                 items.stream()
                      .map(Line::toCommand)
-                     .toList(),
-                method
+                     .toList()
         );
     }
 
@@ -40,8 +35,8 @@ public record OrderCreateRequest(
             Integer quantity
     ) {
 
-        private OfflineOrderCreateCommand.Line toCommand() {
-            return new OfflineOrderCreateCommand.Line(menuId, quantity);
+        private OrderCreateCommand.Line toCommand() {
+            return new OrderCreateCommand.Line(menuId, quantity);
         }
     }
 }

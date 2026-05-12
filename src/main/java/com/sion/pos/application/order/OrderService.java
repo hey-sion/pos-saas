@@ -9,8 +9,10 @@ import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -51,12 +53,11 @@ public class OrderService {
         List<Long> orderIds = orders.stream().map(Order::getId).toList();
         Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdInOrderByIdAsc(orderIds).stream()
                                                                        .collect(Collectors.groupingBy(OrderItem::getOrderId));
-        Map<Long, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(orderIds).stream()
-                                                               .collect(Collectors.toMap(Payment::getOrderId, payment -> payment));
+        Map<Long, Payment> paymentByOrderId = activePaymentByOrderId(orderIds);
 
         return orders.stream()
                      .map(order -> toWaitingOrderInfo(order, itemsByOrderId.getOrDefault(order.getId(), List.of()),
-                             paymentByOrderId.get(order.getId())))
+                                    paymentByOrderId.get(order.getId())))
                      .toList();
     }
 
@@ -70,8 +71,7 @@ public class OrderService {
         List<Long> orderIds = orders.stream().map(Order::getId).toList();
         Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdInOrderByIdAsc(orderIds).stream()
                                                                        .collect(Collectors.groupingBy(OrderItem::getOrderId));
-        Map<Long, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(orderIds).stream()
-                                                               .collect(Collectors.toMap(Payment::getOrderId, payment -> payment));
+        Map<Long, Payment> paymentByOrderId = activePaymentByOrderId(orderIds);
 
         int salesAmount = orders.stream()
                                 .filter(order -> order.getStatus() == Order.Status.DELIVERED)
@@ -102,6 +102,28 @@ public class OrderService {
                 payment != null ? payment.getMethod().name() : null,
                 order.getTotalAmount()
         );
+    }
+
+    private Map<Long, Payment> activePaymentByOrderId(List<Long> orderIds) {
+        return paymentRepository.findByOrderIdIn(orderIds).stream()
+                                .collect(Collectors.groupingBy(Payment::getOrderId))
+                                .entrySet().stream()
+                                .map(entry -> Map.entry(entry.getKey(), pickActivePayment(entry.getValue())))
+                                .filter(entry -> entry.getValue().isPresent())
+                                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get()));
+    }
+
+    private Optional<Payment> pickActivePayment(List<Payment> payments) {
+        Optional<Payment> latestCompleted = payments.stream()
+                                                    .filter(payment -> payment.getStatus() == Payment.Status.COMPLETED)
+                                                    .max(Comparator.comparing(Payment::getId));
+        if (latestCompleted.isPresent()) {
+            return latestCompleted;
+        }
+
+        return payments.stream()
+                       .filter(payment -> payment.getStatus() == Payment.Status.PENDING)
+                       .max(Comparator.comparing(Payment::getId));
     }
 
     private String slotStatus(Payment payment) {

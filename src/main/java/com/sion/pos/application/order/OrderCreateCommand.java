@@ -1,12 +1,10 @@
 package com.sion.pos.application.order;
 
-import com.sion.pos.domain.payment.Payment;
 import java.util.List;
 
-public record OfflineOrderCreateCommand(
+public record OrderCreateCommand(
         Long storeId,
-        List<Line> items,
-        Payment.Method method) {
+        List<Line> items) {
 
     public record Line(Long menuId, Integer quantity) {}
 }

@@ -67,5 +67,5 @@ CREATE TABLE payment (
     updated_at DATETIME(6) NOT NULL,
     deleted_at DATETIME(6),
     PRIMARY KEY (id),
-    UNIQUE KEY uk_payment_order_id (order_id)
+    INDEX idx_payment_order_id (order_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

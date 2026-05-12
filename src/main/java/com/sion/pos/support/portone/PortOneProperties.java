@@ -7,7 +7,12 @@ import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "portone")
-public record PortOneProperties(String storeId, Map<String, String> channelKeys) {
+public record PortOneProperties(
+        String storeId,
+        String apiSecret,
+        String apiBaseUrl,
+        Map<String, String> channelKeys
+) {
 
     public String channelKeyOf(Payment.Provider provider) {
         if (provider == null) {

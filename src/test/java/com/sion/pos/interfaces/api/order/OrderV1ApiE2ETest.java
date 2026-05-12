@@ -10,8 +10,6 @@ import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
 import com.sion.pos.domain.order.OrderRepository;
-import com.sion.pos.domain.payment.Payment;
-import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.DatabaseCleanUp;
@@ -43,7 +41,6 @@ class OrderV1ApiE2ETest {
     @Autowired private MenuRepository menuRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private OrderItemRepository orderItemRepository;
-    @Autowired private PaymentRepository paymentRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private Long storeId;
@@ -68,15 +65,14 @@ class OrderV1ApiE2ETest {
     class Create {
 
         @Test
-        @DisplayName("유효한 요청이면, 201 Created와 생성된 주문 정보를 반환한다.")
+        @DisplayName("유효한 요청이면, 201 Created와 RECEIVED 상태의 주문 정보를 반환한다.")
         void returnsCreated_whenValidRequest() {
             OrderCreateRequest request = new OrderCreateRequest(
                     storeId,
                     List.of(
                             new OrderCreateRequest.Line(americanoId, 1),
                             new OrderCreateRequest.Line(latteId, 2)
-                    ),
-                    Payment.Method.CARD
+                    )
             );
 
             ResponseEntity<OrderCreateResponse> response =
@@ -113,125 +109,15 @@ class OrderV1ApiE2ETest {
                 assertThat(item.getPrice()).isEqualTo(LATTE_PRICE);
                 assertThat(item.getQuantity()).isEqualTo(2);
             });
-
-            Payment payment = paymentRepository.findAll().stream()
-                                               .filter(it -> it.getOrderId().equals(orderId))
-                                               .findFirst()
-                                               .orElseThrow();
-            assertThat(payment.getMethod()).isEqualTo(Payment.Method.CARD);
-            assertThat(payment.getChannel()).isEqualTo(Payment.Channel.OFFLINE);
-            assertThat(payment.getStatus()).isEqualTo(Payment.Status.COMPLETED);
-            assertThat(payment.getAmount()).isEqualTo(order.getTotalAmount());
         }
 
         @Test
         @DisplayName("주문 항목이 비어 있으면, 400 Bad Request를 반환한다.")
         void returnsBadRequest_whenItemsAreEmpty() {
-            OrderCreateRequest request = new OrderCreateRequest(storeId, List.of(), Payment.Method.CASH);
+            OrderCreateRequest request = new OrderCreateRequest(storeId, List.of());
 
             ResponseEntity<ApiResponse<Void>> response =
                     testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @Test
-        @DisplayName("지원하지 않는 결제 방식이면, 400 Bad Request를 반환한다.")
-        void returnsBadRequest_whenMethodUnsupported() {
-            OrderCreateRequest request = new OrderCreateRequest(
-                    storeId,
-                    List.of(new OrderCreateRequest.Line(americanoId, 1)),
-                    Payment.Method.EASY_PAY
-            );
-
-            ResponseEntity<ApiResponse<Void>> response =
-                    testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-    }
-
-    @Nested
-    @DisplayName("간편결제 주문 생성 시, ")
-    class CreateEasyPay {
-
-        private static final String EASY_PAY_ENDPOINT = "/api/v1/orders/easy-pay";
-
-        @Test
-        @DisplayName("유효한 요청이면, 201 Created와 PG 결제 정보를 반환한다.")
-        void returnsCreated_whenValidRequest() {
-            EasyPayOrderCreateRequest request = new EasyPayOrderCreateRequest(
-                    storeId,
-                    List.of(
-                            new EasyPayOrderCreateRequest.Line(americanoId, 1),
-                            new EasyPayOrderCreateRequest.Line(latteId, 2)
-                    ),
-                    Payment.Provider.KAKAO_PAY
-            );
-
-            ResponseEntity<EasyPayOrderCreateResponse> response =
-                    testRestTemplate.exchange(EASY_PAY_ENDPOINT, HttpMethod.POST,
-                            new HttpEntity<>(request), EasyPayOrderCreateResponse.class);
-
-            EasyPayOrderCreateResponse body = response.getBody();
-            Long orderId = body.order().id();
-            Order order = orderRepository.findById(orderId).orElseThrow();
-            Payment payment = paymentRepository.findById(body.payment().id()).orElseThrow();
-
-            assertAll(
-                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
-                    () -> assertThat(body.order().orderNumber()).isEqualTo(1),
-                    () -> assertThat(body.order().totalAmount()).isEqualTo(AMERICANO_PRICE + LATTE_PRICE * 2),
-                    () -> assertThat(body.payment().pgPaymentId()).isNotBlank(),
-                    () -> assertThat(body.portOne().payMethod()).isEqualTo("EASY_PAY"),
-                    () -> assertThat(body.portOne().easyPay().easyPayProvider()).isEqualTo("KAKAOPAY"),
-                    () -> assertThat(body.portOne().paymentId()).isEqualTo(body.payment().pgPaymentId()),
-                    () -> assertThat(body.portOne().totalAmount()).isEqualTo(body.order().totalAmount()),
-                    () -> assertThat(body.portOne().orderName()).isEqualTo("아메리카노 외 1건"),
-                    () -> assertThat(body.portOne().storeId()).isNotBlank(),
-                    () -> assertThat(body.portOne().channelKey()).isNotBlank(),
-                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED),
-                    () -> assertThat(payment.getStatus()).isEqualTo(Payment.Status.PENDING),
-                    () -> assertThat(payment.getMethod()).isEqualTo(Payment.Method.EASY_PAY),
-                    () -> assertThat(payment.getChannel()).isEqualTo(Payment.Channel.PG),
-                    () -> assertThat(payment.getProvider()).isEqualTo(Payment.Provider.KAKAO_PAY),
-                    () -> assertThat(payment.getPaidAt()).isNull()
-            );
-
-            List<OrderItem> items = orderItemRepository.findAll().stream()
-                                                       .filter(item -> item.getOrderId().equals(orderId))
-                                                       .toList();
-            assertThat(items).hasSize(2);
-        }
-
-        @Test
-        @DisplayName("provider가 누락되면, 400 Bad Request를 반환한다.")
-        void returnsBadRequest_whenProviderIsNull() {
-            EasyPayOrderCreateRequest request = new EasyPayOrderCreateRequest(
-                    storeId,
-                    List.of(new EasyPayOrderCreateRequest.Line(americanoId, 1)),
-                    null
-            );
-
-            ResponseEntity<ApiResponse<Void>> response =
-                    testRestTemplate.exchange(EASY_PAY_ENDPOINT, HttpMethod.POST,
-                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        }
-
-        @Test
-        @DisplayName("주문 항목이 비어 있으면, 400 Bad Request를 반환한다.")
-        void returnsBadRequest_whenItemsAreEmpty() {
-            EasyPayOrderCreateRequest request = new EasyPayOrderCreateRequest(
-                    storeId,
-                    List.of(),
-                    Payment.Provider.KAKAO_PAY
-            );
-
-            ResponseEntity<ApiResponse<Void>> response =
-                    testRestTemplate.exchange(EASY_PAY_ENDPOINT, HttpMethod.POST,
-                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -244,7 +130,7 @@ class OrderV1ApiE2ETest {
         @Test
         @DisplayName("DELIVERED로 변경하면, 204 No Content를 반환하고 대기 목록에서 제외된다.")
         void returnsNoContentAndRemovesFromWaitingOrders_whenStatusDelivered() {
-            Long orderId = createOrder(Payment.Method.CASH);
+            Long orderId = createOrder();
             OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.DELIVERED);
 
             ResponseEntity<Void> response =
@@ -262,7 +148,7 @@ class OrderV1ApiE2ETest {
         @Test
         @DisplayName("CANCELLED로 변경하면, 204 No Content를 반환하고 대기 목록에서 제외된다.")
         void returnsNoContentAndRemovesFromWaitingOrders_whenStatusCancelled() {
-            Long orderId = createOrder(Payment.Method.CARD);
+            Long orderId = createOrder();
             OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.CANCELLED);
 
             ResponseEntity<Void> response =
@@ -280,7 +166,7 @@ class OrderV1ApiE2ETest {
         @Test
         @DisplayName("RECEIVED로 변경하려고 하면, 400 Bad Request를 반환한다.")
         void returnsBadRequest_whenStatusReceived() {
-            Long orderId = createOrder(Payment.Method.CASH);
+            Long orderId = createOrder();
             OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.RECEIVED);
 
             ResponseEntity<ApiResponse<Void>> response =
@@ -297,7 +183,7 @@ class OrderV1ApiE2ETest {
         @Test
         @DisplayName("이미 전달 완료된 주문을 취소하려고 하면, 409 Conflict를 반환한다.")
         void returnsConflict_whenCancellingDeliveredOrder() {
-            Long orderId = createOrder(Payment.Method.CASH);
+            Long orderId = createOrder();
             OrderStatusUpdateRequest deliveredRequest = new OrderStatusUpdateRequest(Order.Status.DELIVERED);
             testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/status", HttpMethod.PATCH, new HttpEntity<>(deliveredRequest), Void.class);
 
@@ -316,7 +202,7 @@ class OrderV1ApiE2ETest {
         @Test
         @DisplayName("이미 취소된 주문을 전달 완료하려고 하면, 409 Conflict를 반환한다.")
         void returnsConflict_whenDeliveringCancelledOrder() {
-            Long orderId = createOrder(Payment.Method.CASH);
+            Long orderId = createOrder();
             OrderStatusUpdateRequest cancelledRequest = new OrderStatusUpdateRequest(Order.Status.CANCELLED);
             testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/status", HttpMethod.PATCH, new HttpEntity<>(cancelledRequest), Void.class);
 
@@ -354,9 +240,9 @@ class OrderV1ApiE2ETest {
         @DisplayName("전체 주문을 주문번호 오름차순으로 반환한다.")
         void returnsOrdersOrderedByOrderNumber() {
             LocalDate today = LocalDate.now();
-            Long firstOrderId = createOrder(Payment.Method.CASH);
-            Long secondOrderId = createOrder(Payment.Method.CARD);
-            Long thirdOrderId = createOrder(Payment.Method.CASH);
+            Long firstOrderId = createOrder();
+            Long secondOrderId = createOrder();
+            Long thirdOrderId = createOrder();
             updateOrderStatus(firstOrderId, Order.Status.DELIVERED);
             updateOrderStatus(secondOrderId, Order.Status.CANCELLED);
 
@@ -380,9 +266,9 @@ class OrderV1ApiE2ETest {
         @DisplayName("전달 완료 주문만 매출로 집계한다.")
         void calculatesSalesOnlyWithDeliveredOrders() {
             LocalDate today = LocalDate.now();
-            Long deliveredOrderId = createOrder(Payment.Method.CASH);
-            Long cancelledOrderId = createOrder(Payment.Method.CARD);
-            createOrder(Payment.Method.CASH);
+            Long deliveredOrderId = createOrder();
+            Long cancelledOrderId = createOrder();
+            createOrder();
             updateOrderStatus(deliveredOrderId, Order.Status.DELIVERED);
             updateOrderStatus(cancelledOrderId, Order.Status.CANCELLED);
 
@@ -419,11 +305,10 @@ class OrderV1ApiE2ETest {
         }
     }
 
-    private Long createOrder(Payment.Method method) {
+    private Long createOrder() {
         OrderCreateRequest request = new OrderCreateRequest(
                 storeId,
-                List.of(new OrderCreateRequest.Line(americanoId, 1)),
-                method
+                List.of(new OrderCreateRequest.Line(americanoId, 1))
         );
 
         ResponseEntity<OrderCreateResponse> response =

@@ -278,9 +278,45 @@
         .pay-btn:hover { background: var(--gray-50); border-color: var(--gray-300); }
         .pay-btn:active { transform: scale(0.97); }
         .pay-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
-        .pay-btn.kakao { background: #fee500; border-color: #e6cf00; color: #191919; }
-        .pay-btn.kakao:hover { background: #f7dc00; }
-        .pay-btn.kakao:disabled { opacity: 0.35; }
+        .pay-btn.primary {
+            grid-column: 1 / -1;
+            height: 52px;
+            background: var(--blue-500);
+            border-color: var(--blue-500);
+            color: var(--white);
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .pay-btn.primary:hover { background: var(--blue-600); border-color: var(--blue-600); }
+        .pay-btn.primary:disabled { background: var(--blue-500); border-color: var(--blue-500); }
+
+        /* Payment method selection modal */
+        .pay-method-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 280px;
+        }
+        .pay-method-option {
+            font-family: var(--font);
+            font-size: 15px;
+            font-weight: 700;
+            height: 56px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            color: var(--gray-800);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.12s;
+        }
+        .pay-method-option:hover { background: var(--gray-50); border-color: var(--blue-500); }
+        .pay-method-option:active { transform: scale(0.98); }
+        .pay-method-option:disabled { opacity: 0.45; cursor: default; transform: none; }
+        .pay-method-option.kakao { background: #fee500; border-color: #e6cf00; color: #191919; }
+        .pay-method-option.kakao:hover { background: #f7dc00; border-color: #e6cf00; }
 
         /* ── Right: Customer Queue ── */
         .queue-pane {
@@ -677,30 +713,17 @@
 
 <div id="toast" class="toast"></div>
 
-<div id="qrOverlay" class="qr-overlay" aria-hidden="true">
-    <div class="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
-        <div class="qr-order-num" id="qrTitle">간편결제</div>
-        <div class="qr-amount" id="qrAmount">0원</div>
-        <div class="qr-placeholder">
-            <svg width="88" height="88" viewBox="0 0 80 80" fill="none" aria-hidden="true">
-                <rect x="2" y="2" width="26" height="26" rx="2" stroke="#d1d6db" stroke-width="2"/>
-                <rect x="8" y="8" width="14" height="14" rx="1" fill="#d1d6db"/>
-                <rect x="52" y="2" width="26" height="26" rx="2" stroke="#d1d6db" stroke-width="2"/>
-                <rect x="58" y="8" width="14" height="14" rx="1" fill="#d1d6db"/>
-                <rect x="2" y="52" width="26" height="26" rx="2" stroke="#d1d6db" stroke-width="2"/>
-                <rect x="8" y="58" width="14" height="14" rx="1" fill="#d1d6db"/>
-                <rect x="36" y="2" width="8" height="8" rx="1" fill="#d1d6db" opacity="0.5"/>
-                <rect x="36" y="14" width="8" height="8" rx="1" fill="#d1d6db" opacity="0.3"/>
-                <rect x="52" y="52" width="12" height="12" rx="1" fill="#d1d6db" opacity="0.4"/>
-                <rect x="66" y="52" width="12" height="12" rx="1" fill="#d1d6db" opacity="0.3"/>
-                <rect x="52" y="66" width="12" height="12" rx="1" fill="#d1d6db" opacity="0.3"/>
-                <rect x="66" y="66" width="12" height="12" rx="1" fill="#d1d6db" opacity="0.2"/>
-            </svg>
+<div id="paymentMethodOverlay" class="qr-overlay" aria-hidden="true">
+    <div class="qr-modal" role="dialog" aria-modal="true" aria-labelledby="paymentMethodTitle">
+        <div class="qr-order-num" id="paymentMethodTitle">결제수단 선택</div>
+        <div class="qr-amount" id="paymentMethodAmount">0원</div>
+        <div class="pay-method-options">
+            <button class="pay-method-option" id="btnPayCash" type="button">현금</button>
+            <button class="pay-method-option" id="btnPayCard" type="button">카드 단말기</button>
+            <button class="pay-method-option kakao" id="btnPayKakao" type="button">카카오페이</button>
         </div>
-        <div class="qr-hint" id="qrHint">QR 생성 대기</div>
         <div class="qr-btns">
-            <button class="qr-btn primary" id="qrAcceptButton" type="button">결제 접수</button>
-            <button class="qr-btn" id="qrCloseButton" type="button">닫기</button>
+            <button class="qr-btn" id="paymentMethodCloseButton" type="button">닫기</button>
         </div>
     </div>
 </div>
@@ -769,9 +792,7 @@
                 <span class="amount" id="orderTotal">0원</span>
             </div>
             <div class="pay-row">
-                <button class="pay-btn" id="btnCash" disabled>현금</button>
-                <button class="pay-btn" id="btnCard" disabled>카드 단말기</button>
-                <button class="pay-btn kakao" id="btnKakaoPay" disabled>카카오페이</button>
+                <button class="pay-btn primary" id="btnSubmitOrder" disabled>주문하기</button>
             </div>
         </div>
     </section>
@@ -783,6 +804,7 @@
     </aside>
 </div>
 
+<script src="https://cdn.portone.io/v2/browser-sdk.js"></script>
 <script src="/js/pos/index.js"></script>
 </body>
 </html>

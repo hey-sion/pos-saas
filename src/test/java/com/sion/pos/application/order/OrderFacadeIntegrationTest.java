@@ -9,8 +9,6 @@ import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
 import com.sion.pos.domain.order.OrderRepository;
-import com.sion.pos.domain.payment.Payment;
-import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.DatabaseCleanUp;
@@ -35,7 +33,6 @@ class OrderFacadeIntegrationTest {
     @Autowired private MenuRepository menuRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private OrderItemRepository orderItemRepository;
-    @Autowired private PaymentRepository paymentRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private static final int AMERICANO_PRICE = 4_000;
@@ -59,19 +56,18 @@ class OrderFacadeIntegrationTest {
     }
 
     @Nested
-    @DisplayName("오프라인 주문 생성 시, ")
-    class CreateOffline {
+    @DisplayName("주문 생성 시, ")
+    class CreateOrder {
 
         @Test
         @DisplayName("주문은 RECEIVED 상태로 저장되고 총액이 정확히 계산된다")
         void persistsOrderWithReceivedStatusAndTotalAmount() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
+            OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1),
-                            new OfflineOrderCreateCommand.Line(latteId, 2)),
-                    Payment.Method.CASH);
+                    List.of(new OrderCreateCommand.Line(americanoId, 1),
+                            new OrderCreateCommand.Line(latteId, 2)));
 
-            Order created = orderFacade.createOffline(command);
+            Order created = orderFacade.createOrder(command);
 
             Order persisted = orderRepository.findById(created.getId()).orElseThrow();
             assertThat(persisted.getStatus()).isEqualTo(Order.Status.RECEIVED);
@@ -83,13 +79,12 @@ class OrderFacadeIntegrationTest {
         @Test
         @DisplayName("주문 항목에 주문 시점의 메뉴명/가격 스냅샷이 저장된다")
         void persistsOrderItemsWithMenuSnapshot() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
+            OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1),
-                            new OfflineOrderCreateCommand.Line(latteId, 2)),
-                    Payment.Method.CASH);
+                    List.of(new OrderCreateCommand.Line(americanoId, 1),
+                            new OrderCreateCommand.Line(latteId, 2)));
 
-            Order created = orderFacade.createOffline(command);
+            Order created = orderFacade.createOrder(command);
 
             List<OrderItem> items = orderItemRepository.findAll().stream()
                                                        .filter(i -> i.getOrderId().equals(created.getId()))
@@ -110,66 +105,14 @@ class OrderFacadeIntegrationTest {
         }
 
         @Test
-        @DisplayName("CASH 결제 시 결제는 즉시 완료 상태가 된다")
-        void completesPaymentImmediatelyForCash() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
-                    storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Method.CASH);
-
-            Order created = orderFacade.createOffline(command);
-
-            Payment payment = paymentRepository.findAll().stream()
-                                               .filter(p -> p.getOrderId().equals(created.getId()))
-                                               .findFirst().orElseThrow();
-            assertThat(payment.getStatus()).isEqualTo(Payment.Status.COMPLETED);
-            assertThat(payment.getMethod()).isEqualTo(Payment.Method.CASH);
-            assertThat(payment.getChannel()).isEqualTo(Payment.Channel.OFFLINE);
-            assertThat(payment.getProvider()).isNull();
-            assertThat(payment.getPgPaymentId()).isNull();
-            assertThat(payment.getAmount()).isEqualTo(created.getTotalAmount());
-            assertThat(payment.getPaidAt()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("CARD 결제 시 결제는 즉시 완료 상태가 된다")
-        void completesPaymentImmediatelyForCard() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
-                    storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Method.CARD);
-
-            Order created = orderFacade.createOffline(command);
-
-            Payment payment = paymentRepository.findAll().stream()
-                                               .filter(p -> p.getOrderId().equals(created.getId()))
-                                               .findFirst().orElseThrow();
-            assertThat(payment.getStatus()).isEqualTo(Payment.Status.COMPLETED);
-            assertThat(payment.getMethod()).isEqualTo(Payment.Method.CARD);
-            assertThat(payment.getChannel()).isEqualTo(Payment.Channel.OFFLINE);
-        }
-
-        @Test
-        @DisplayName("EASY_PAY 가 들어오면 BAD_REQUEST 예외를 발생시킨다")
-        void throwsWhenMethodIsEasyPay() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
-                    storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Method.EASY_PAY);
-
-            expects(ErrorType.BAD_REQUEST, () -> orderFacade.createOffline(command));
-        }
-
-        @Test
         @DisplayName("같은 매장의 두 번째 주문은 orderNumber가 2가 된다")
         void incrementsOrderNumberOnSecondOrder() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
+            OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Method.CARD);
+                    List.of(new OrderCreateCommand.Line(americanoId, 1)));
 
-            Order first = orderFacade.createOffline(command);
-            Order second = orderFacade.createOffline(command);
+            Order first = orderFacade.createOrder(command);
+            Order second = orderFacade.createOrder(command);
 
             assertThat(first.getOrderNumber()).isEqualTo(1);
             assertThat(second.getOrderNumber()).isEqualTo(2);
@@ -181,12 +124,11 @@ class OrderFacadeIntegrationTest {
             LocalDate yesterday = LocalDate.now().minusDays(1);
             orderRepository.save(Order.create(storeId, yesterday, 5, AMERICANO_PRICE));
 
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
+            OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Method.CASH);
+                    List.of(new OrderCreateCommand.Line(americanoId, 1)));
 
-            Order today = orderFacade.createOffline(command);
+            Order today = orderFacade.createOrder(command);
 
             assertThat(today.getOrderNumber()).isEqualTo(1);
         }
@@ -196,15 +138,13 @@ class OrderFacadeIntegrationTest {
         void otherStoreOrderDoesNotAffectOurNumber() {
             Store other = storeRepository.save(Store.create("다른 매장", null));
             Long otherMenuId = menuRepository.save(Menu.create(other.getId(), "다른 메뉴", 3_000, 1)).getId();
-            orderFacade.createOffline(new OfflineOrderCreateCommand(
+            orderFacade.createOrder(new OrderCreateCommand(
                     other.getId(),
-                    List.of(new OfflineOrderCreateCommand.Line(otherMenuId, 1)),
-                    Payment.Method.CASH));
+                    List.of(new OrderCreateCommand.Line(otherMenuId, 1))));
 
-            Order ours = orderFacade.createOffline(new OfflineOrderCreateCommand(
+            Order ours = orderFacade.createOrder(new OrderCreateCommand(
                     storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Method.CASH));
+                    List.of(new OrderCreateCommand.Line(americanoId, 1))));
 
             assertThat(ours.getOrderNumber()).isEqualTo(1);
         }
@@ -212,22 +152,21 @@ class OrderFacadeIntegrationTest {
         @Test
         @DisplayName("주문 항목이 비어 있으면 BAD_REQUEST 예외를 발생시킨다")
         void throwsWhenItemsEmpty() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(storeId, List.of(), Payment.Method.CASH);
+            OrderCreateCommand command = new OrderCreateCommand(storeId, List.of());
 
-            expects(ErrorType.BAD_REQUEST, () -> orderFacade.createOffline(command));
+            expects(ErrorType.BAD_REQUEST, () -> orderFacade.createOrder(command));
         }
 
         @Test
         @DisplayName("중복된 메뉴가 포함되면 BAD_REQUEST 예외를 발생시킨다")
         void throwsWhenDuplicatedMenu() {
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
+            OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
                     List.of(
-                            new OfflineOrderCreateCommand.Line(americanoId, 1),
-                            new OfflineOrderCreateCommand.Line(americanoId, 2)),
-                    Payment.Method.CASH);
+                            new OrderCreateCommand.Line(americanoId, 1),
+                            new OrderCreateCommand.Line(americanoId, 2)));
 
-            expects(ErrorType.BAD_REQUEST, () -> orderFacade.createOffline(command));
+            expects(ErrorType.BAD_REQUEST, () -> orderFacade.createOrder(command));
         }
 
         @Test
@@ -235,12 +174,11 @@ class OrderFacadeIntegrationTest {
         void throwsWhenMenuFromOtherStore() {
             Store other = storeRepository.save(Store.create("다른 매장", null));
             Long otherMenuId = menuRepository.save(Menu.create(other.getId(), "다른 메뉴", 3_000, 1)).getId();
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
+            OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(otherMenuId, 1)),
-                    Payment.Method.CASH);
+                    List.of(new OrderCreateCommand.Line(otherMenuId, 1)));
 
-            expects(ErrorType.NOT_FOUND, () -> orderFacade.createOffline(command));
+            expects(ErrorType.NOT_FOUND, () -> orderFacade.createOrder(command));
         }
 
         @Test
@@ -249,121 +187,11 @@ class OrderFacadeIntegrationTest {
             Menu menu = menuRepository.findById(americanoId).orElseThrow();
             menu.delete();
             menuRepository.save(menu);
-            OfflineOrderCreateCommand command = new OfflineOrderCreateCommand(
+            OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OfflineOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Method.CASH);
+                    List.of(new OrderCreateCommand.Line(americanoId, 1)));
 
-            expects(ErrorType.NOT_FOUND, () -> orderFacade.createOffline(command));
-        }
-    }
-
-    @Nested
-    @DisplayName("간편결제 주문 생성 시, ")
-    class CreateEasyPay {
-
-        @Test
-        @DisplayName("Order와 PENDING 상태의 PG 결제가 함께 생성된다")
-        void persistsOrderAndPendingPgPayment() {
-            EasyPayOrderCreateCommand command = new EasyPayOrderCreateCommand(
-                    storeId,
-                    List.of(new EasyPayOrderCreateCommand.Line(americanoId, 1),
-                            new EasyPayOrderCreateCommand.Line(latteId, 2)),
-                    Payment.Provider.KAKAO_PAY);
-
-            EasyPayOrderCreateInfo info = orderFacade.createEasyPay(command);
-
-            Order persisted = orderRepository.findById(info.orderId()).orElseThrow();
-            assertThat(persisted.getStatus()).isEqualTo(Order.Status.RECEIVED);
-            assertThat(persisted.getTotalAmount()).isEqualTo(AMERICANO_PRICE + LATTE_PRICE * 2);
-
-            Payment payment = paymentRepository.findById(info.paymentId()).orElseThrow();
-            assertThat(payment.getStatus()).isEqualTo(Payment.Status.PENDING);
-            assertThat(payment.getMethod()).isEqualTo(Payment.Method.EASY_PAY);
-            assertThat(payment.getChannel()).isEqualTo(Payment.Channel.PG);
-            assertThat(payment.getProvider()).isEqualTo(Payment.Provider.KAKAO_PAY);
-            assertThat(payment.getPgPaymentId()).isNotBlank();
-            assertThat(payment.getPaidAt()).isNull();
-            assertThat(payment.getAmount()).isEqualTo(persisted.getTotalAmount());
-        }
-
-        @Test
-        @DisplayName("응답에 포트원 호출용 정보가 포함된다")
-        void returnsPortOneRequestInfo() {
-            EasyPayOrderCreateCommand command = new EasyPayOrderCreateCommand(
-                    storeId,
-                    List.of(new EasyPayOrderCreateCommand.Line(americanoId, 1),
-                            new EasyPayOrderCreateCommand.Line(latteId, 2)),
-                    Payment.Provider.KAKAO_PAY);
-
-            EasyPayOrderCreateInfo info = orderFacade.createEasyPay(command);
-
-            assertThat(info.pgPaymentId()).isNotBlank();
-            assertThat(info.provider()).isEqualTo(Payment.Provider.KAKAO_PAY);
-            assertThat(info.totalAmount()).isEqualTo(AMERICANO_PRICE + LATTE_PRICE * 2);
-            assertThat(info.orderName()).isEqualTo("아메리카노 외 1건");
-            assertThat(info.portOneStoreId()).isNotBlank();
-            assertThat(info.channelKey()).isNotBlank();
-        }
-
-        @Test
-        @DisplayName("단일 항목 주문이면 orderName 은 메뉴명만 사용된다")
-        void buildsOrderNameForSingleItem() {
-            EasyPayOrderCreateCommand command = new EasyPayOrderCreateCommand(
-                    storeId,
-                    List.of(new EasyPayOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Provider.KAKAO_PAY);
-
-            EasyPayOrderCreateInfo info = orderFacade.createEasyPay(command);
-
-            assertThat(info.orderName()).isEqualTo("아메리카노");
-        }
-
-        @Test
-        @DisplayName("두 번 호출하면 서로 다른 pgPaymentId 가 발급된다")
-        void issuesDistinctPgPaymentIds() {
-            EasyPayOrderCreateCommand command = new EasyPayOrderCreateCommand(
-                    storeId,
-                    List.of(new EasyPayOrderCreateCommand.Line(americanoId, 1)),
-                    Payment.Provider.KAKAO_PAY);
-
-            EasyPayOrderCreateInfo first = orderFacade.createEasyPay(command);
-            EasyPayOrderCreateInfo second = orderFacade.createEasyPay(command);
-
-            assertThat(first.pgPaymentId()).isNotEqualTo(second.pgPaymentId());
-        }
-
-        @Test
-        @DisplayName("provider 가 null 이면 BAD_REQUEST 예외를 발생시킨다")
-        void throwsWhenProviderIsNull() {
-            EasyPayOrderCreateCommand command = new EasyPayOrderCreateCommand(
-                    storeId,
-                    List.of(new EasyPayOrderCreateCommand.Line(americanoId, 1)),
-                    null);
-
-            expects(ErrorType.BAD_REQUEST, () -> orderFacade.createEasyPay(command));
-        }
-
-        @Test
-        @DisplayName("주문 항목이 비어 있으면 BAD_REQUEST 예외를 발생시킨다")
-        void throwsWhenItemsEmpty() {
-            EasyPayOrderCreateCommand command = new EasyPayOrderCreateCommand(
-                    storeId, List.of(), Payment.Provider.KAKAO_PAY);
-
-            expects(ErrorType.BAD_REQUEST, () -> orderFacade.createEasyPay(command));
-        }
-
-        @Test
-        @DisplayName("다른 매장의 메뉴가 포함되면 NOT_FOUND 예외를 던진다")
-        void throwsWhenMenuFromOtherStore() {
-            Store other = storeRepository.save(Store.create("다른 매장", null));
-            Long otherMenuId = menuRepository.save(Menu.create(other.getId(), "다른 메뉴", 3_000, 1)).getId();
-            EasyPayOrderCreateCommand command = new EasyPayOrderCreateCommand(
-                    storeId,
-                    List.of(new EasyPayOrderCreateCommand.Line(otherMenuId, 1)),
-                    Payment.Provider.KAKAO_PAY);
-
-            expects(ErrorType.NOT_FOUND, () -> orderFacade.createEasyPay(command));
+            expects(ErrorType.NOT_FOUND, () -> orderFacade.createOrder(command));
         }
     }
 

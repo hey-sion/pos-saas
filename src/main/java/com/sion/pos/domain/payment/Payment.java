@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseEntity {
 
-    @Column(name = "order_id", nullable = false, unique = true)
+    @Column(name = "order_id", nullable = false)
     private Long orderId;
 
     @Enumerated(EnumType.STRING)
@@ -97,7 +97,7 @@ public class Payment extends BaseEntity {
         return payment;
     }
 
-    public void complete(LocalDateTime paidAt) {
+    public void complete(LocalDateTime paidAt, String transactionKey) {
         if (paidAt == null) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "paidAt은 필수입니다.");
         }
@@ -109,6 +109,7 @@ public class Payment extends BaseEntity {
 
         this.status = Status.COMPLETED;
         this.paidAt = paidAt;
+        this.pgTransactionKey = transactionKey;
     }
 
     public void fail(String reason) {

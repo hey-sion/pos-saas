@@ -28,13 +28,7 @@ public class OrderV1ApiController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrderCreateResponse create(@Valid @RequestBody OrderCreateRequest request) {
-        return OrderCreateResponse.from(orderFacade.createOffline(request.toCommand()));
-    }
-
-    @PostMapping("/easy-pay")
-    @ResponseStatus(HttpStatus.CREATED)
-    public EasyPayOrderCreateResponse createEasyPay(@Valid @RequestBody EasyPayOrderCreateRequest request) {
-        return EasyPayOrderCreateResponse.from(orderFacade.createEasyPay(request.toCommand()));
+        return OrderCreateResponse.from(orderFacade.createOrder(request.toCommand()));
     }
 
     @PatchMapping("/{orderId}/status")

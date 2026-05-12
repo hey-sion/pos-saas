@@ -22,6 +22,8 @@ server:
 
 portone:
   store-id: ${PORTONE_STORE_ID:store-test}
+  api-secret: ${PORTONE_API_SECRET:test-secret}
+  api-base-url: ${PORTONE_API_BASE_URL:https://api.portone.io}
   channel-keys:
     KAKAO_PAY: ${PORTONE_CHANNEL_KEY_KAKAO_PAY:channel-key-test-kakao}
 
