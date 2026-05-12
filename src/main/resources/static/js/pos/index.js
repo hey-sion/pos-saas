@@ -278,13 +278,23 @@ async function handleEasyPayPayment(provider) {
     setPaymentMethodButtonsDisabled(true);
 
     try {
-        const result = await createPayment("EASY_PAY", provider);
-        closePaymentMethodModal(true);
-        clearCart();
-        await requestPortOne(result.pg);
+        const created = await createPayment("EASY_PAY", provider);
+        await requestPortOne(created.pg);
+        const verified = await verifyPayment(created.payment.id);
+
+        if (verified.status === "COMPLETED") {
+            closePaymentMethodModal(true);
+            clearCart();
+            showToast("결제가 완료되었습니다");
+        } else if (verified.status === "FAILED") {
+            showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소되었습니다");
+        } else {
+            showToast("결제 확인 중입니다. 잠시 후 다시 시도해주세요");
+        }
+
         await refreshWaitingOrders();
     } catch {
-        showToast("결제 요청에 실패했습니다");
+        showToast("결제 처리에 실패했습니다");
     } finally {
         state.paymentInProgress = false;
         setPaymentMethodButtonsDisabled(false);
@@ -293,12 +303,11 @@ async function handleEasyPayPayment(provider) {
 
 async function requestPortOne(pg) {
     if (typeof PortOne === "undefined" || !PortOne.requestPayment) {
-        showToast("PortOne SDK 로드 실패");
         return;
     }
 
     try {
-        const response = await PortOne.requestPayment({
+        await PortOne.requestPayment({
             storeId: pg.storeId,
             channelKey: pg.channelKey,
             paymentId: pg.paymentId,
@@ -308,16 +317,22 @@ async function requestPortOne(pg) {
             payMethod: pg.payMethod,
             easyPay: pg.easyPay
         });
-
-        if (response && response.code) {
-            showToast(`결제 실패: ${response.message ?? response.code}`);
-            return;
-        }
-
-        showToast("결제 접수 완료 (확인 대기 중)");
-    } catch (error) {
-        showToast(`결제 처리 중 오류: ${error?.message ?? "알 수 없음"}`);
+    } catch {
+        // TODO SDK 예외는 후속 verify 단계에서 백엔드 단건 조회로 권위있는 상태 확인
     }
+}
+
+async function verifyPayment(paymentId) {
+    const response = await fetch(`/api/v1/payments/${paymentId}/verify`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"}
+    });
+
+    if (!response.ok) {
+        throw new Error("Failed to verify payment");
+    }
+
+    return response.json();
 }
 
 function setPaymentMethodButtonsDisabled(disabled) {

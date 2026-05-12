@@ -8,6 +8,8 @@ services:
     container_name: pos-saas-app
     ports:
       - "8080:8080"
+    env_file:
+      - ../.env
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/pos_saas?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
       SPRING_DATASOURCE_USERNAME: pos

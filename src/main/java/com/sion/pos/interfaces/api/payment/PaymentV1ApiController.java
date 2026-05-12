@@ -4,6 +4,7 @@ import com.sion.pos.application.payment.PaymentFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,5 +22,11 @@ public class PaymentV1ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public PaymentCreateResponse create(@Valid @RequestBody PaymentCreateRequest request) {
         return PaymentCreateResponse.from(paymentFacade.createPayment(request.toCommand()));
+    }
+
+    @PostMapping("/{paymentId}/verify")
+    @ResponseStatus(HttpStatus.OK)
+    public PaymentVerifyResponse verify(@PathVariable Long paymentId) {
+        return PaymentVerifyResponse.from(paymentFacade.verify(paymentId));
     }
 }

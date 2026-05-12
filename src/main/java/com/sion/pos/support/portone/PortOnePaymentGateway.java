@@ -53,14 +53,20 @@ public class PortOnePaymentGateway implements PaymentGateway {
         }
     }
 
-    private PaymentGatewayResult.Status mapStatus(String status) {
+    static PaymentGatewayResult.Status mapStatus(String status) {
         if (status == null) {
+            log.warn("PortOne 응답에 status가 없습니다. PENDING으로 임시 처리");
             return PaymentGatewayResult.Status.PENDING;
         }
+
         return switch (status) {
             case "PAID" -> PaymentGatewayResult.Status.PAID;
             case "FAILED", "CANCELLED", "PARTIAL_CANCELLED" -> PaymentGatewayResult.Status.FAILED;
-            default -> PaymentGatewayResult.Status.PENDING;
+            case "READY", "PENDING", "VIRTUAL_ACCOUNT_ISSUED", "PAY_PENDING" -> PaymentGatewayResult.Status.PENDING;
+            default -> {
+                log.warn("PortOne 응답의 알 수 없는 status='{}'. PENDING으로 임시 처리", status);
+                yield PaymentGatewayResult.Status.PENDING;
+            }
         };
     }
 
