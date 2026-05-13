@@ -9,12 +9,15 @@ import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
 import com.sion.pos.domain.order.OrderRepository;
+import com.sion.pos.domain.payment.Payment;
+import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.DatabaseCleanUp;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +36,7 @@ class OrderFacadeIntegrationTest {
     @Autowired private MenuRepository menuRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private OrderItemRepository orderItemRepository;
+    @Autowired private PaymentRepository paymentRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private static final int AMERICANO_PRICE = 4_000;
@@ -64,8 +68,8 @@ class OrderFacadeIntegrationTest {
         void persistsOrderWithReceivedStatusAndTotalAmount() {
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OrderCreateCommand.Line(americanoId, 1),
-                            new OrderCreateCommand.Line(latteId, 2)));
+                    List.of(new OrderItemLine(americanoId, 1),
+                            new OrderItemLine(latteId, 2)));
 
             Order created = orderFacade.createOrder(command);
 
@@ -81,8 +85,8 @@ class OrderFacadeIntegrationTest {
         void persistsOrderItemsWithMenuSnapshot() {
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OrderCreateCommand.Line(americanoId, 1),
-                            new OrderCreateCommand.Line(latteId, 2)));
+                    List.of(new OrderItemLine(americanoId, 1),
+                            new OrderItemLine(latteId, 2)));
 
             Order created = orderFacade.createOrder(command);
 
@@ -109,7 +113,7 @@ class OrderFacadeIntegrationTest {
         void incrementsOrderNumberOnSecondOrder() {
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OrderCreateCommand.Line(americanoId, 1)));
+                    List.of(new OrderItemLine(americanoId, 1)));
 
             Order first = orderFacade.createOrder(command);
             Order second = orderFacade.createOrder(command);
@@ -126,7 +130,7 @@ class OrderFacadeIntegrationTest {
 
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OrderCreateCommand.Line(americanoId, 1)));
+                    List.of(new OrderItemLine(americanoId, 1)));
 
             Order today = orderFacade.createOrder(command);
 
@@ -140,11 +144,11 @@ class OrderFacadeIntegrationTest {
             Long otherMenuId = menuRepository.save(Menu.create(other.getId(), "다른 메뉴", 3_000, 1)).getId();
             orderFacade.createOrder(new OrderCreateCommand(
                     other.getId(),
-                    List.of(new OrderCreateCommand.Line(otherMenuId, 1))));
+                    List.of(new OrderItemLine(otherMenuId, 1))));
 
             Order ours = orderFacade.createOrder(new OrderCreateCommand(
                     storeId,
-                    List.of(new OrderCreateCommand.Line(americanoId, 1))));
+                    List.of(new OrderItemLine(americanoId, 1))));
 
             assertThat(ours.getOrderNumber()).isEqualTo(1);
         }
@@ -163,8 +167,8 @@ class OrderFacadeIntegrationTest {
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
                     List.of(
-                            new OrderCreateCommand.Line(americanoId, 1),
-                            new OrderCreateCommand.Line(americanoId, 2)));
+                            new OrderItemLine(americanoId, 1),
+                            new OrderItemLine(americanoId, 2)));
 
             expects(ErrorType.BAD_REQUEST, () -> orderFacade.createOrder(command));
         }
@@ -176,7 +180,7 @@ class OrderFacadeIntegrationTest {
             Long otherMenuId = menuRepository.save(Menu.create(other.getId(), "다른 메뉴", 3_000, 1)).getId();
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OrderCreateCommand.Line(otherMenuId, 1)));
+                    List.of(new OrderItemLine(otherMenuId, 1)));
 
             expects(ErrorType.NOT_FOUND, () -> orderFacade.createOrder(command));
         }
@@ -189,14 +193,91 @@ class OrderFacadeIntegrationTest {
             menuRepository.save(menu);
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
-                    List.of(new OrderCreateCommand.Line(americanoId, 1)));
+                    List.of(new OrderItemLine(americanoId, 1)));
 
             expects(ErrorType.NOT_FOUND, () -> orderFacade.createOrder(command));
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 항목 수정 시, ")
+    class UpdateOrderItems {
+
+        @Test
+        @DisplayName("결제 완료 전 주문이면 항목과 총액을 교체한다")
+        void replacesItemsAndTotalAmountBeforePaymentCompleted() {
+            Order order = createOrderWith(new OrderItemLine(americanoId, 1));
+            OrderUpdateItemsCommand command = new OrderUpdateItemsCommand(
+                    List.of(
+                            new OrderItemLine(americanoId, 2),
+                            new OrderItemLine(latteId, 1)
+                    ));
+
+            Order updated = orderFacade.updateOrderItems(order.getId(), command);
+
+            Order persisted = orderRepository.findById(updated.getId()).orElseThrow();
+            List<OrderItem> activeItems = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(order.getId()));
+            assertThat(persisted.getTotalAmount()).isEqualTo(AMERICANO_PRICE * 2 + LATTE_PRICE);
+            assertThat(activeItems).hasSize(2);
+            assertThat(activeItems).anySatisfy(item -> {
+                assertThat(item.getMenuId()).isEqualTo(americanoId);
+                assertThat(item.getQuantity()).isEqualTo(2);
+            });
+            assertThat(activeItems).anySatisfy(item -> {
+                assertThat(item.getMenuId()).isEqualTo(latteId);
+                assertThat(item.getQuantity()).isEqualTo(1);
+            });
+        }
+
+        @Test
+        @DisplayName("이미 결제 완료된 주문이면 CONFLICT 예외를 발생시킨다")
+        void throwsConflictWhenPaymentAlreadyCompleted() {
+            Order order = createOrderWith(new OrderItemLine(americanoId, 1));
+            paymentRepository.save(Payment.createOffline(order.getId(), Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
+            OrderUpdateItemsCommand command = new OrderUpdateItemsCommand(
+                    List.of(new OrderItemLine(latteId, 1)));
+
+            expects(ErrorType.CONFLICT, () -> orderFacade.updateOrderItems(order.getId(), command));
+        }
+
+        @Test
+        @DisplayName("기존 PENDING PG 결제가 있으면 FAILED 처리한다")
+        void failsPendingPgPaymentWhenOrderItemsUpdated() {
+            Order order = createOrderWith(new OrderItemLine(americanoId, 1));
+            Payment pendingPg = paymentRepository.save(Payment.createPg(
+                    order.getId(),
+                    Payment.Provider.KAKAO_PAY,
+                    AMERICANO_PRICE,
+                    "pg-old"));
+            OrderUpdateItemsCommand command = new OrderUpdateItemsCommand(
+                    List.of(new OrderItemLine(latteId, 1)));
+
+            orderFacade.updateOrderItems(order.getId(), command);
+
+            Payment persisted = paymentRepository.findById(pendingPg.getId()).orElseThrow();
+            assertThat(persisted.getStatus()).isEqualTo(Payment.Status.FAILED);
+            assertThat(persisted.getFailReason()).isEqualTo("주문 수정으로 기존 결제 요청 무효화");
+        }
+
+        @Test
+        @DisplayName("취소된 주문이면 CONFLICT 예외를 발생시킨다")
+        void throwsConflictWhenOrderCancelled() {
+            Order order = createOrderWith(new OrderItemLine(americanoId, 1));
+            order.cancel();
+            orderRepository.save(order);
+            OrderUpdateItemsCommand command = new OrderUpdateItemsCommand(
+                    List.of(new OrderItemLine(latteId, 1)));
+
+            expects(ErrorType.CONFLICT, () -> orderFacade.updateOrderItems(order.getId(), command));
         }
     }
 
     private static void expects(ErrorType expected, ThrowingCallable callable) {
         assertThatThrownBy(callable).isInstanceOfSatisfying(PosApplicationException.class,
                                     e -> assertThat(e.getErrorType()).isEqualTo(expected));
+    }
+
+    private Order createOrderWith(OrderItemLine... lines) {
+        return orderFacade.createOrder(new OrderCreateCommand(storeId, List.of(lines)));
     }
 }

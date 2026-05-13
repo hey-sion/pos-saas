@@ -1,6 +1,6 @@
 package com.sion.pos.interfaces.api.order;
 
-import com.sion.pos.application.order.OrderCreateCommand;
+import com.sion.pos.application.order.OrderUpdateItemsCommand;
 import com.sion.pos.application.order.OrderItemLine;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -8,18 +8,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 
-public record OrderCreateRequest(
-        @NotNull(message = "storeId는 필수입니다.")
-        @Positive(message = "storeId는 1 이상이어야 합니다.")
-        Long storeId,
-
+public record OrderUpdateItemsRequest(
         @NotEmpty(message = "주문 항목이 비어 있습니다.")
         List<@Valid Line> items
 ) {
 
-    public OrderCreateCommand toCommand() {
-        return new OrderCreateCommand(
-                storeId,
+    public OrderUpdateItemsCommand toCommand() {
+        return new OrderUpdateItemsCommand(
                 items.stream()
                      .map(Line::toCommand)
                      .toList()

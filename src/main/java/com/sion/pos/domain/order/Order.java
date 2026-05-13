@@ -80,6 +80,17 @@ public class Order extends BaseEntity {
         this.status = Status.CANCELLED;
     }
 
+    public void changeTotalAmount(Integer totalAmount) {
+        if (this.status != Status.RECEIVED) {
+            throw new PosApplicationException(ErrorType.CONFLICT, "주문 접수 상태에서만 수정 가능합니다. 현재 상태: " + this.status);
+        }
+        if (totalAmount == null || totalAmount <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "totalAmount는 1 이상이어야 합니다.");
+        }
+
+        this.totalAmount = totalAmount;
+    }
+
     public enum Status {
         RECEIVED,
         DELIVERED,

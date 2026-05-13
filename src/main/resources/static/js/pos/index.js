@@ -7,7 +7,8 @@ const state = {
     orderSubmitting: false,
     paymentInProgress: false,
     selectedWaitingOrder: null,
-    pendingOrder: null
+    pendingOrder: null,
+    editingOrderId: null
 };
 
 const formatPrice = (price) => new Intl.NumberFormat("ko-KR").format(price) + "원";
@@ -114,6 +115,15 @@ function changeQuantity(menuId, delta) {
 
 function clearCart() {
     state.cart = [];
+    state.pendingOrder = null;
+    state.editingOrderId = null;
+    renderCart();
+}
+
+function resetOrderDraft() {
+    state.cart = [];
+    state.pendingOrder = null;
+    state.editingOrderId = null;
     renderCart();
 }
 
@@ -194,11 +204,14 @@ async function submitOrder() {
     updateSubmitOrderButton();
 
     try {
-        const order = await createOrder();
+        const order = state.editingOrderId
+            ? await updateOrderItems(state.editingOrderId)
+            : await createOrder();
         state.pendingOrder = order;
+        state.editingOrderId = order.id;
         openPaymentMethodModal();
     } catch {
-        showToast("주문 생성에 실패했습니다");
+        showToast("주문 처리에 실패했습니다");
     } finally {
         state.orderSubmitting = false;
         updateSubmitOrderButton();
@@ -222,6 +235,27 @@ async function createOrder() {
 
     if (response.status !== 201) {
         throw new Error("Failed to create order");
+    }
+
+    return response.json();
+}
+
+async function updateOrderItems(orderId) {
+    const payload = {
+        items: state.cart.map((item) => ({
+            menuId: item.menuId,
+            quantity: item.quantity
+        }))
+    };
+
+    const response = await fetch(`/api/v1/orders/${orderId}/items`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error("Failed to update order items");
     }
 
     return response.json();
@@ -257,7 +291,7 @@ async function handleOfflinePayment(method) {
     try {
         await createPayment(method, null);
         closePaymentMethodModal(true);
-        clearCart();
+        resetOrderDraft();
         playCompletionSound();
         await refreshWaitingOrders();
         showToast("주문이 생성되었습니다");
@@ -284,7 +318,7 @@ async function handleEasyPayPayment(provider) {
 
         if (verified.status === "COMPLETED") {
             closePaymentMethodModal(true);
-            clearCart();
+            resetOrderDraft();
             showToast("결제가 완료되었습니다");
         } else if (verified.status === "FAILED") {
             showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소되었습니다");
@@ -504,7 +538,11 @@ async function cancelSelectedWaitingOrder() {
     }
 
     try {
-        await updateOrderStatus(state.selectedWaitingOrder.id, "CANCELLED");
+        const cancelledOrderId = state.selectedWaitingOrder.id;
+        await updateOrderStatus(cancelledOrderId, "CANCELLED");
+        if (state.editingOrderId === cancelledOrderId) {
+            resetOrderDraft();
+        }
         closeOrderDetail();
         await refreshWaitingOrders();
         showToast("주문이 취소되었습니다");

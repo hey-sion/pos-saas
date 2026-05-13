@@ -144,7 +144,7 @@ public class PaymentFacade {
     }
 
     private String buildOrderName(Long orderId) {
-        List<OrderItem> items = orderItemRepository.findByOrderIdInOrderByIdAsc(List.of(orderId));
+        List<OrderItem> items = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(orderId));
         if (items.isEmpty()) {
             return "주문";
         }

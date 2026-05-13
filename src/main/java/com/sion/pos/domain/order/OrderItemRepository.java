@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
-    List<OrderItem> findByOrderIdInOrderByIdAsc(List<Long> orderIds);
+    List<OrderItem> findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List<Long> orderIds);
 }

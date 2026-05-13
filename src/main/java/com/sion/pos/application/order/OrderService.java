@@ -51,7 +51,7 @@ public class OrderService {
         }
 
         List<Long> orderIds = orders.stream().map(Order::getId).toList();
-        Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdInOrderByIdAsc(orderIds).stream()
+        Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(orderIds).stream()
                                                                        .collect(Collectors.groupingBy(OrderItem::getOrderId));
         Map<Long, Payment> paymentByOrderId = activePaymentByOrderId(orderIds);
 
@@ -69,7 +69,7 @@ public class OrderService {
         }
 
         List<Long> orderIds = orders.stream().map(Order::getId).toList();
-        Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdInOrderByIdAsc(orderIds).stream()
+        Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(orderIds).stream()
                                                                        .collect(Collectors.groupingBy(OrderItem::getOrderId));
         Map<Long, Payment> paymentByOrderId = activePaymentByOrderId(orderIds);
 

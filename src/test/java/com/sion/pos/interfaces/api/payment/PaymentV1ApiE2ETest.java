@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.sion.pos.application.order.OrderCreateCommand;
 import com.sion.pos.application.order.OrderFacade;
+import com.sion.pos.application.order.OrderItemLine;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
@@ -250,6 +251,6 @@ class PaymentV1ApiE2ETest {
     private Order createOrder(Long menuId, int quantity) {
         return orderFacade.createOrder(new OrderCreateCommand(
                 storeId,
-                List.of(new OrderCreateCommand.Line(menuId, quantity))));
+                List.of(new OrderItemLine(menuId, quantity))));
     }
 }

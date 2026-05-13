@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sion.pos.application.order.OrderCreateCommand;
 import com.sion.pos.application.order.OrderFacade;
+import com.sion.pos.application.order.OrderItemLine;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
@@ -132,7 +133,7 @@ class PaymentFacadeIntegrationTest {
     private Order createOrderWith(Long menuId, int quantity) {
         return orderFacade.createOrder(new OrderCreateCommand(
                 storeId,
-                List.of(new OrderCreateCommand.Line(menuId, quantity))));
+                List.of(new OrderItemLine(menuId, quantity))));
     }
 
     private static void expects(ErrorType expected, ThrowingCallable callable) {

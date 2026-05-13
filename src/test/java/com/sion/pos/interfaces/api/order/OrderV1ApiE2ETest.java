@@ -10,9 +10,12 @@ import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
 import com.sion.pos.domain.order.OrderRepository;
+import com.sion.pos.domain.payment.Payment;
+import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.DatabaseCleanUp;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -41,6 +44,7 @@ class OrderV1ApiE2ETest {
     @Autowired private MenuRepository menuRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private OrderItemRepository orderItemRepository;
+    @Autowired private PaymentRepository paymentRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private Long storeId;
@@ -120,6 +124,51 @@ class OrderV1ApiE2ETest {
                     testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 항목 수정 시, ")
+    class UpdateItems {
+
+        @Test
+        @DisplayName("결제 완료 전 주문이면 200 OK와 수정된 총액을 반환한다.")
+        void returnsOk_whenOrderIsNotPaid() {
+            Long orderId = createOrder();
+            OrderUpdateItemsRequest request = new OrderUpdateItemsRequest(
+                    List.of(
+                            new OrderUpdateItemsRequest.Line(americanoId, 2),
+                            new OrderUpdateItemsRequest.Line(latteId, 1)
+                    ));
+
+            ResponseEntity<OrderCreateResponse> response =
+                    testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/items", HttpMethod.PUT,
+                            new HttpEntity<>(request), OrderCreateResponse.class);
+
+            Order order = orderRepository.findById(orderId).orElseThrow();
+            List<OrderItem> activeItems = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(orderId));
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(response.getBody().id()).isEqualTo(orderId),
+                    () -> assertThat(response.getBody().totalAmount()).isEqualTo(AMERICANO_PRICE * 2 + LATTE_PRICE),
+                    () -> assertThat(order.getTotalAmount()).isEqualTo(AMERICANO_PRICE * 2 + LATTE_PRICE),
+                    () -> assertThat(activeItems).hasSize(2)
+            );
+        }
+
+        @Test
+        @DisplayName("이미 결제 완료된 주문이면 409 Conflict를 반환한다.")
+        void returnsConflict_whenOrderAlreadyPaid() {
+            Long orderId = createOrder();
+            paymentRepository.save(Payment.createOffline(orderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
+            OrderUpdateItemsRequest request = new OrderUpdateItemsRequest(
+                    List.of(new OrderUpdateItemsRequest.Line(latteId, 1)));
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/items", HttpMethod.PUT,
+                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
     }
 

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,6 +30,14 @@ public class OrderV1ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public OrderCreateResponse create(@Valid @RequestBody OrderCreateRequest request) {
         return OrderCreateResponse.from(orderFacade.createOrder(request.toCommand()));
+    }
+
+    @PutMapping("/{orderId}/items")
+    public OrderCreateResponse updateItems(
+            @PathVariable Long orderId,
+            @Valid @RequestBody OrderUpdateItemsRequest request
+    ) {
+        return OrderCreateResponse.from(orderFacade.updateOrderItems(orderId, request.toCommand()));
     }
 
     @PatchMapping("/{orderId}/status")
