@@ -113,18 +113,32 @@ function changeQuantity(menuId, delta) {
     renderCart();
 }
 
-function clearCart() {
+function resetOrderDraft() {
     state.cart = [];
     state.pendingOrder = null;
     state.editingOrderId = null;
     renderCart();
 }
 
-function resetOrderDraft() {
-    state.cart = [];
-    state.pendingOrder = null;
-    state.editingOrderId = null;
-    renderCart();
+async function clearCurrentOrder() {
+    if (state.orderSubmitting || state.paymentInProgress) {
+        return;
+    }
+
+    if (!state.editingOrderId) {
+        resetOrderDraft();
+        return;
+    }
+
+    try {
+        await updateOrderStatus(state.editingOrderId, "CANCELLED");
+        closePaymentMethodModal(true);
+        resetOrderDraft();
+        await refreshWaitingOrders();
+        showToast("주문이 취소되었습니다");
+    } catch {
+        showToast("주문 취소에 실패했습니다");
+    }
 }
 
 function getCartTotal() {
@@ -492,12 +506,14 @@ function createWaitingOrderSlot(order) {
 }
 
 function openOrderDetail(order) {
+    const isPaid = order.status === "PAID";
     state.selectedWaitingOrder = order;
     document.getElementById("orderDetailTitle").textContent = `#${order.orderNumber} 주문 확인`;
-    document.getElementById("orderDetailStatus").textContent = order.status === "PAID" ? "결제 완료" : "결제 대기";
+    document.getElementById("orderDetailStatus").textContent = isPaid ? "결제 완료" : "결제 대기";
     document.getElementById("orderDetailPayment").textContent = formatPaymentMethod(order.paymentMethod);
     document.getElementById("orderDetailTotal").textContent = formatPrice(order.totalAmount ?? 0);
     document.getElementById("orderDetailItems").replaceChildren(...createOrderDetailItemRows(order.items));
+    document.getElementById("orderEditButton").hidden = isPaid;
     hideCancelConfirmation();
     document.getElementById("orderDetailOverlay").classList.add("show");
     document.getElementById("orderDetailOverlay").setAttribute("aria-hidden", "false");
@@ -515,6 +531,23 @@ function showCancelConfirmation() {
 
 function hideCancelConfirmation() {
     document.getElementById("orderCancelConfirm").classList.remove("show");
+}
+
+function editSelectedWaitingOrder() {
+    if (!state.selectedWaitingOrder || state.selectedWaitingOrder.status === "PAID") {
+        return;
+    }
+
+    state.cart = (state.selectedWaitingOrder.items ?? []).map((item) => ({
+        menuId: item.menuId,
+        name: item.menuName,
+        price: item.price,
+        quantity: item.quantity
+    }));
+    state.pendingOrder = null;
+    state.editingOrderId = state.selectedWaitingOrder.id;
+    closeOrderDetail();
+    renderCart();
 }
 
 async function completeSelectedWaitingOrder() {
@@ -620,13 +653,14 @@ function showToast(message) {
 }
 
 function bindEvents() {
-    document.querySelector(".clear-btn").addEventListener("click", clearCart);
+    document.querySelector(".clear-btn").addEventListener("click", clearCurrentOrder);
     document.getElementById("btnSubmitOrder").addEventListener("click", submitOrder);
     document.getElementById("btnPayCash").addEventListener("click", () => handleOfflinePayment("CASH"));
     document.getElementById("btnPayCard").addEventListener("click", () => handleOfflinePayment("CARD"));
     document.getElementById("btnPayKakao").addEventListener("click", () => handleEasyPayPayment("KAKAO_PAY"));
     document.getElementById("paymentMethodCloseButton").addEventListener("click", () => closePaymentMethodModal());
     document.getElementById("orderDetailCloseButton").addEventListener("click", closeOrderDetail);
+    document.getElementById("orderEditButton").addEventListener("click", editSelectedWaitingOrder);
     document.getElementById("orderDeliverButton").addEventListener("click", completeSelectedWaitingOrder);
     document.getElementById("orderCancelButton").addEventListener("click", showCancelConfirmation);
     document.getElementById("orderCancelDismissButton").addEventListener("click", hideCancelConfirmation);

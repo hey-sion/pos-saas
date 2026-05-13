@@ -24,12 +24,14 @@ public record WaitingOrderResponse(
     }
 
     public record Item(
+            Long menuId,
             String menuName,
+            Integer price,
             Integer quantity
     ) {
 
         private static Item from(WaitingOrderInfo.Item item) {
-            return new Item(item.menuName(), item.quantity());
+            return new Item(item.menuId(), item.menuName(), item.price(), item.quantity());
         }
     }
 }

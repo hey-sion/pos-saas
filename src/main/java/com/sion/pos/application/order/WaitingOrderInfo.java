@@ -12,7 +12,9 @@ public record WaitingOrderInfo(
 ) {
 
     public record Item(
+            Long menuId,
             String menuName,
+            Integer price,
             Integer quantity
     ) {
     }

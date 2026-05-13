@@ -213,6 +213,28 @@ class OrderV1ApiE2ETest {
         }
 
         @Test
+        @DisplayName("PENDING PG 결제가 있는 주문을 취소하면 결제 요청을 FAILED 처리한다.")
+        void failsPendingPgPayment_whenStatusCancelled() {
+            Long orderId = createOrder();
+            Payment payment = paymentRepository.save(Payment.createPg(
+                    orderId,
+                    Payment.Provider.KAKAO_PAY,
+                    AMERICANO_PRICE,
+                    "pg-pending"));
+            OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.CANCELLED);
+
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/status", HttpMethod.PATCH, new HttpEntity<>(request), Void.class);
+
+            Payment persisted = paymentRepository.findById(payment.getId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.FAILED),
+                    () -> assertThat(persisted.getFailReason()).isEqualTo("주문 취소로 기존 결제 요청 무효화")
+            );
+        }
+
+        @Test
         @DisplayName("RECEIVED로 변경하려고 하면, 400 Bad Request를 반환한다.")
         void returnsBadRequest_whenStatusReceived() {
             Long orderId = createOrder();

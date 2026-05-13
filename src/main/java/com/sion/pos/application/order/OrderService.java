@@ -33,7 +33,10 @@ public class OrderService {
 
         switch (status) {
             case DELIVERED -> order.deliver();
-            case CANCELLED -> order.cancel();
+            case CANCELLED -> {
+                order.cancel();
+                invalidatePendingPgPayments(order.getId());
+            }
             case RECEIVED -> throw new PosApplicationException(ErrorType.BAD_REQUEST, "변경할 수 없는 주문 상태입니다.");
         }
     }
@@ -97,7 +100,11 @@ public class OrderService {
                 order.getOrderNumber(),
                 slotStatus(payment),
                 items.stream()
-                     .map(item -> new WaitingOrderInfo.Item(item.getMenuName(), item.getQuantity()))
+                     .map(item -> new WaitingOrderInfo.Item(
+                             item.getMenuId(),
+                             item.getMenuName(),
+                             item.getPrice(),
+                             item.getQuantity()))
                      .toList(),
                 payment != null ? payment.getMethod().name() : null,
                 order.getTotalAmount()
@@ -124,6 +131,13 @@ public class OrderService {
         return payments.stream()
                        .filter(payment -> payment.getStatus() == Payment.Status.PENDING)
                        .max(Comparator.comparing(Payment::getId));
+    }
+
+    private void invalidatePendingPgPayments(Long orderId) {
+        paymentRepository.findByOrderIdIn(List.of(orderId)).stream()
+                         .filter(payment -> payment.getChannel() == Payment.Channel.PG)
+                         .filter(payment -> payment.getStatus() == Payment.Status.PENDING)
+                         .forEach(payment -> payment.fail("주문 취소로 기존 결제 요청 무효화"));
     }
 
     private String slotStatus(Payment payment) {
