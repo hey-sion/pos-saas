@@ -32,7 +32,10 @@ public class OrderService {
                                      .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
 
         switch (status) {
-            case DELIVERED -> order.deliver();
+            case DELIVERED -> {
+                validatePaymentCompleted(order.getId());
+                order.deliver();
+            }
             case CANCELLED -> {
                 order.cancel();
                 invalidatePendingPgPayments(order.getId());
@@ -138,6 +141,14 @@ public class OrderService {
                          .filter(payment -> payment.getChannel() == Payment.Channel.PG)
                          .filter(payment -> payment.getStatus() == Payment.Status.PENDING)
                          .forEach(payment -> payment.fail("주문 취소로 기존 결제 요청 무효화"));
+    }
+
+    private void validatePaymentCompleted(Long orderId) {
+        boolean completed = paymentRepository.findByOrderIdIn(List.of(orderId)).stream()
+                                             .anyMatch(payment -> payment.getStatus() == Payment.Status.COMPLETED);
+        if (!completed) {
+            throw new PosApplicationException(ErrorType.CONFLICT, "결제 완료된 주문만 전달완료 처리할 수 있습니다.");
+        }
     }
 
     private String slotStatus(Payment payment) {

@@ -514,6 +514,7 @@ function openOrderDetail(order) {
     document.getElementById("orderDetailTotal").textContent = formatPrice(order.totalAmount ?? 0);
     document.getElementById("orderDetailItems").replaceChildren(...createOrderDetailItemRows(order.items));
     document.getElementById("orderEditButton").hidden = isPaid;
+    document.getElementById("orderDeliverButton").hidden = !isPaid;
     hideCancelConfirmation();
     document.getElementById("orderDetailOverlay").classList.add("show");
     document.getElementById("orderDetailOverlay").setAttribute("aria-hidden", "false");

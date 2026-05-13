@@ -177,9 +177,10 @@ class OrderV1ApiE2ETest {
     class UpdateStatus {
 
         @Test
-        @DisplayName("DELIVERED로 변경하면, 204 No Content를 반환하고 대기 목록에서 제외된다.")
+        @DisplayName("결제 완료 주문을 DELIVERED로 변경하면, 204 No Content를 반환하고 대기 목록에서 제외된다.")
         void returnsNoContentAndRemovesFromWaitingOrders_whenStatusDelivered() {
             Long orderId = createOrder();
+            paymentRepository.save(Payment.createOffline(orderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
             OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.DELIVERED);
 
             ResponseEntity<Void> response =
@@ -191,6 +192,23 @@ class OrderV1ApiE2ETest {
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT),
                     () -> assertThat(order.getStatus()).isEqualTo(Order.Status.DELIVERED),
                     () -> assertThat(waitingOrders).extracting(WaitingOrderResponse::id).doesNotContain(orderId)
+            );
+        }
+
+        @Test
+        @DisplayName("결제 완료되지 않은 주문을 DELIVERED로 변경하려고 하면, 409 Conflict를 반환한다.")
+        void returnsConflict_whenDeliveringUnpaidOrder() {
+            Long orderId = createOrder();
+            OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.DELIVERED);
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/status", HttpMethod.PATCH,
+                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
+
+            Order order = orderRepository.findById(orderId).orElseThrow();
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED)
             );
         }
 
@@ -255,6 +273,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("이미 전달 완료된 주문을 취소하려고 하면, 409 Conflict를 반환한다.")
         void returnsConflict_whenCancellingDeliveredOrder() {
             Long orderId = createOrder();
+            paymentRepository.save(Payment.createOffline(orderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
             OrderStatusUpdateRequest deliveredRequest = new OrderStatusUpdateRequest(Order.Status.DELIVERED);
             testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/status", HttpMethod.PATCH, new HttpEntity<>(deliveredRequest), Void.class);
 
@@ -314,6 +333,7 @@ class OrderV1ApiE2ETest {
             Long firstOrderId = createOrder();
             Long secondOrderId = createOrder();
             Long thirdOrderId = createOrder();
+            paymentRepository.save(Payment.createOffline(firstOrderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
             updateOrderStatus(firstOrderId, Order.Status.DELIVERED);
             updateOrderStatus(secondOrderId, Order.Status.CANCELLED);
 
@@ -340,6 +360,7 @@ class OrderV1ApiE2ETest {
             Long deliveredOrderId = createOrder();
             Long cancelledOrderId = createOrder();
             createOrder();
+            paymentRepository.save(Payment.createOffline(deliveredOrderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
             updateOrderStatus(deliveredOrderId, Order.Status.DELIVERED);
             updateOrderStatus(cancelledOrderId, Order.Status.CANCELLED);
 
