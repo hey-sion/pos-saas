@@ -35,8 +35,6 @@ public class PaymentFacade {
 
     @Transactional
     public PaymentCreateInfo createPayment(PaymentCreateCommand command) {
-        validateCommand(command);
-
         Order order = orderRepository.findById(command.orderId())
                                      .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
         if (order.getStatus() != Order.Status.RECEIVED) {
@@ -124,24 +122,6 @@ public class PaymentFacade {
         Payment refreshed = paymentRepository.findById(payment.getId())
                                              .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다."));
         return PaymentVerifyInfo.from(refreshed);
-    }
-
-    private void validateCommand(PaymentCreateCommand command) {
-        if (command.orderId() == null || command.orderId() <= 0) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "주문 정보가 올바르지 않습니다.");
-        }
-
-        if (command.method() == null) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "결제 수단을 선택해주세요.");
-        }
-
-        if (command.method() == Payment.Method.EASY_PAY && command.provider() == null) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "간편결제는 결제사 정보가 필요합니다.");
-        }
-
-        if (command.method() != Payment.Method.EASY_PAY && command.provider() != null) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "현금/카드 결제는 결제사 정보를 보낼 수 없습니다.");
-        }
     }
 
     private String generatePgPaymentId() {
