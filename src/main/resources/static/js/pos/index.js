@@ -97,17 +97,24 @@ function addMenuToCart(menu) {
     renderCart();
 }
 
-function changeQuantity(menuId, delta) {
+async function changeQuantity(menuId, delta) {
     const item = state.cart.find((cartItem) => cartItem.menuId === menuId);
 
     if (!item) {
         return;
     }
 
-    item.quantity += delta;
+    const nextQuantity = item.quantity + delta;
 
-    if (item.quantity <= 0) {
+    if (nextQuantity <= 0 && state.cart.length === 1) {
+        await clearCurrentOrder();
+        return;
+    }
+
+    if (nextQuantity <= 0) {
         state.cart = state.cart.filter((cartItem) => cartItem.menuId !== menuId);
+    } else {
+        item.quantity = nextQuantity;
     }
 
     renderCart();
