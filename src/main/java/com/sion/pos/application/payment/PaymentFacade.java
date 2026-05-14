@@ -15,9 +15,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentFacade {
@@ -105,20 +107,23 @@ public class PaymentFacade {
 
         switch (result.status()) {
             case PAID -> {
-                if (!payment.getAmount().equals(result.amount())) {
-                    throw new PosApplicationException(ErrorType.CONFLICT,
-                            "결제 금액이 일치하지 않습니다. 요청 금액: " + payment.getAmount() + ", PG 응답 금액: " + result.amount());
+                if (!payment.matchesAmount(result.amount())) {
+                    log.error("[AMOUNT_MISMATCH] paymentId={} expected={} actual={}",
+                            payment.getId(), payment.getAmount(), result.amount());
+                    return PaymentVerifyInfo.from(payment);
                 }
 
-                payment.complete(LocalDateTime.now(), result.transactionKey());
+                paymentRepository.completeIfPending(payment.getId(), LocalDateTime.now(), result.transactionKey());
             }
-            case FAILED -> payment.fail(result.failReason());
+            case FAILED -> paymentRepository.failIfPending(payment.getId(), result.failReason());
             case PENDING -> {
                 // PortOne 측에서도 아직 결제 완료 안 됨. PENDING 그대로 반환.
             }
         }
 
-        return PaymentVerifyInfo.from(payment);
+        Payment refreshed = paymentRepository.findById(payment.getId())
+                                             .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다."));
+        return PaymentVerifyInfo.from(refreshed);
     }
 
     private void validateCommand(PaymentCreateCommand command) {

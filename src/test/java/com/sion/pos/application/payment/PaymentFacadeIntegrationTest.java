@@ -1,7 +1,9 @@
 package com.sion.pos.application.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.sion.pos.application.order.OrderCreateCommand;
 import com.sion.pos.application.order.OrderFacade;
@@ -11,12 +13,15 @@ import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.payment.Payment;
+import com.sion.pos.domain.payment.PaymentGatewayResult;
 import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.DatabaseCleanUp;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
+import com.sion.pos.support.portone.FakePaymentGateway;
+import com.sion.pos.support.portone.FakePaymentGatewayConfig;
 import java.util.List;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
@@ -26,8 +31,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 @SpringBootTest
+@Import(FakePaymentGatewayConfig.class)
 class PaymentFacadeIntegrationTest {
 
     private static final int AMERICANO_PRICE = 4_000;
@@ -38,6 +45,7 @@ class PaymentFacadeIntegrationTest {
     @Autowired private MenuRepository menuRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private PaymentRepository paymentRepository;
+    @Autowired private FakePaymentGateway fakePaymentGateway;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private Long storeId;
@@ -130,10 +138,107 @@ class PaymentFacadeIntegrationTest {
         }
     }
 
+    @Nested
+    @DisplayName("결제 검증 시, ")
+    class Verify {
+
+        @Test
+        @DisplayName("PortOne이 PAID를 응답하면 COMPLETED 상태로 변경한다")
+        void completesPaymentWhenPortOneRespondsPaid() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+
+            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(info.status()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(info.paidAt()).isNotNull(),
+                    () -> assertThat(info.failReason()).isNull(),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(persisted.getPgTransactionKey()).isEqualTo("tx-abc")
+            );
+        }
+
+        @Test
+        @DisplayName("PortOne이 FAILED를 응답하면 FAILED 상태로 변경한다")
+        void failsPaymentWhenPortOneRespondsFailed() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.FAILED, null, null, "사용자 취소"));
+
+            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(info.status()).isEqualTo(Payment.Status.FAILED),
+                    () -> assertThat(info.failReason()).isEqualTo("사용자 취소"),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.FAILED)
+            );
+        }
+
+        @Test
+        @DisplayName("PortOne이 PENDING을 응답하면 PENDING 상태를 유지한다")
+        void keepsPendingWhenPortOneRespondsPending() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PENDING, null, null, null));
+
+            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+
+            assertThat(info.status()).isEqualTo(Payment.Status.PENDING);
+        }
+
+        @Test
+        @DisplayName("이미 완료된 결제를 재검증하면 상태를 변경하지 않는다")
+        void keepsCompletedPaymentWhenVerifyAgain() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+            paymentFacade.verify(created.paymentId());
+            fakePaymentGateway.clear();
+
+            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(info.status()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(persisted.getPgTransactionKey()).isEqualTo("tx-abc")
+            );
+        }
+
+        @Test
+        @DisplayName("결제 금액이 일치하지 않으면 PENDING 상태를 유지한다")
+        void keepsPendingWhenAmountMismatched() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE + 1_000, "tx-abc", null));
+
+            assertThatCode(() -> paymentFacade.verify(created.paymentId())).doesNotThrowAnyException();
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.PENDING),
+                    () -> assertThat(persisted.getPaidAt()).isNull(),
+                    () -> assertThat(persisted.getPgTransactionKey()).isNull()
+            );
+        }
+    }
+
     private Order createOrderWith(Long menuId, int quantity) {
         return orderFacade.createOrder(new OrderCreateCommand(
                 storeId,
                 List.of(new OrderItemLine(menuId, quantity))));
+    }
+
+    private PaymentCreateInfo createPgPayment() {
+        Order order = createOrderWith(americanoId, 1);
+        return paymentFacade.createPayment(new PaymentCreateCommand(
+                order.getId(),
+                Payment.Method.EASY_PAY,
+                Payment.Provider.KAKAO_PAY));
     }
 
     private static void expects(ErrorType expected, ThrowingCallable callable) {

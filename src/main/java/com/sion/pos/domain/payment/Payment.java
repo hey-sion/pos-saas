@@ -122,6 +122,10 @@ public class Payment extends BaseEntity {
         this.failReason = reason;
     }
 
+    public boolean matchesAmount(Integer amount) {
+        return this.amount.equals(amount);
+    }
+
     private static void validateCommon(Long orderId, Integer amount) {
         if (orderId == null || orderId <= 0) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "orderId는 1 이상이어야 합니다.");
