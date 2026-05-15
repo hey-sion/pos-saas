@@ -24,9 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PaymentFacade {
 
-    private static final String CURRENCY_KRW = "KRW";
-    private static final String PAY_METHOD_EASY_PAY = "EASY_PAY";
-
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
@@ -54,22 +51,11 @@ public class PaymentFacade {
                     command.provider(),
                     order.getTotalAmount(),
                     generatePgPaymentId()));
-            return new PaymentCreateInfo(
-                    payment.getId(),
-                    payment.getOrderId(),
-                    payment.getMethod(),
-                    payment.getStatus(),
-                    payment.getAmount(),
-                    new PaymentCreateInfo.PgRequestParams(
-                            payment.getPgPaymentId(),
-                            portOneProperties.storeId(),
-                            portOneProperties.channelKeyOf(command.provider()),
-                            buildOrderName(order.getId()),
-                            order.getTotalAmount(),
-                            PAY_METHOD_EASY_PAY,
-                            new PaymentCreateInfo.PgRequestParams.EasyPay(command.provider().toPortOneCode()),
-                            CURRENCY_KRW
-                    )
+            return PaymentCreateInfo.pg(
+                    payment,
+                    portOneProperties.storeId(),
+                    portOneProperties.channelKeyOf(command.provider()),
+                    buildOrderName(order.getId())
             );
         }
 
@@ -78,14 +64,7 @@ public class PaymentFacade {
                 command.method(),
                 order.getTotalAmount(),
                 LocalDateTime.now()));
-        return new PaymentCreateInfo(
-                payment.getId(),
-                payment.getOrderId(),
-                payment.getMethod(),
-                payment.getStatus(),
-                payment.getAmount(),
-                null
-        );
+        return PaymentCreateInfo.offline(payment);
     }
 
     @Transactional
