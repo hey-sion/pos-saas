@@ -361,6 +361,11 @@ async function requestPortOne(pg) {
         return;
     }
 
+    // 결제창 호출 시점의 body 자식만 hide. PortOne wrapper는 호출 후 body에 추가되므로 영향 없음.
+    // 부모 페이지 paint cost 줄여 카카오페이 결제창 내부 팝업 응답성 개선.
+    const childrenBefore = Array.from(document.body.children);
+    childrenBefore.forEach(el => el.style.visibility = "hidden");
+
     try {
         await PortOne.requestPayment({
             storeId: pg.storeId,
@@ -374,6 +379,8 @@ async function requestPortOne(pg) {
         });
     } catch {
         // TODO SDK 예외는 후속 verify 단계에서 백엔드 단건 조회로 권위있는 상태 확인
+    } finally {
+        childrenBefore.forEach(el => el.style.visibility = "");
     }
 }
 
