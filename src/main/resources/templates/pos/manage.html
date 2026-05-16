@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS 관리</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f5f6f8;
+            --white: #ffffff;
+            --gray-50: #f9fafb;
+            --gray-100: #f2f4f6;
+            --gray-200: #e5e8eb;
+            --gray-400: #b0b8c1;
+            --gray-500: #8b95a1;
+            --gray-600: #6b7684;
+            --gray-800: #333d4b;
+            --gray-900: #191f28;
+            --blue-50: #e8f3ff;
+            --blue-500: #3182f6;
+            --green-50: #e8faf5;
+            --green-600: #1aab6e;
+            --red-50: #fff0f0;
+            --red-500: #f44336;
+            --radius-sm: 8px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --font: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--gray-900);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            height: 56px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        .logo {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+        }
+        .tab {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-500);
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .tab:hover { color: var(--gray-800); background: var(--gray-100); }
+        .tab.active { color: var(--blue-500); background: var(--blue-50); }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        .manage-layout {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            min-height: calc(100vh - 56px);
+        }
+        .manage-sidebar {
+            background: var(--white);
+            border-right: 1px solid var(--gray-200);
+            padding: 20px 16px;
+        }
+        .manage-nav {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            min-height: 40px;
+            padding: 0 10px;
+            border-radius: var(--radius-sm);
+            color: var(--gray-600);
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .manage-nav:hover {
+            background: var(--gray-100);
+            color: var(--gray-800);
+        }
+        .manage-nav.active {
+            background: var(--blue-50);
+            color: var(--blue-500);
+        }
+        .manage-panel {
+            padding: 24px;
+            overflow-y: auto;
+        }
+        .manage-content {
+            max-width: 1040px;
+        }
+        .manage-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .manage-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+        .date-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-600);
+        }
+        .date-input {
+            height: 36px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: var(--white);
+            padding: 0 10px;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+        .date-input:focus {
+            outline: none;
+            border-color: var(--blue-500);
+        }
+        .daily-summary {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            padding: 18px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+        }
+        .daily-label {
+            font-size: 12px;
+            color: var(--gray-500);
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .daily-amount {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+        .daily-count {
+            font-size: 12px;
+            color: var(--gray-500);
+            margin-top: 4px;
+        }
+        .section-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-600);
+            margin-bottom: 10px;
+        }
+        .order-history {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .history-empty {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--gray-400);
+            text-align: center;
+            padding: 44px 0;
+        }
+        .history-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+        }
+        .history-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .history-num {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--gray-800);
+            min-width: 36px;
+        }
+        .history-menu {
+            font-size: 13px;
+            color: var(--gray-600);
+        }
+        .history-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-align: right;
+        }
+        .history-amount {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--gray-800);
+        }
+        .history-pay {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+        .history-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 99px;
+        }
+        .history-status.received { background: var(--blue-50); color: var(--blue-500); }
+        .history-status.delivered { background: var(--green-50); color: var(--green-600); }
+        .history-status.cancelled { background: var(--red-50); color: var(--red-500); }
+
+        @media (max-width: 760px) {
+            .manage-layout { grid-template-columns: 1fr; }
+            .manage-sidebar {
+                border-right: 0;
+                border-bottom: 1px solid var(--gray-200);
+            }
+        }
+    </style>
+</head>
+<body>
+<header class="header">
+    <div class="header-left">
+        <span class="logo">POS</span>
+        <nav class="tabs">
+            <a class="tab" href="/">메뉴</a>
+            <a class="tab active" href="/manage">관리</a>
+        </nav>
+    </div>
+    <div class="header-right">
+        <span id="storeName">매장명: -</span>
+        <span id="businessDate"></span>
+    </div>
+</header>
+
+<main class="manage-layout">
+    <aside class="manage-sidebar">
+        <a class="manage-nav active" href="/manage">판매 관리</a>
+    </aside>
+
+    <section class="manage-panel">
+        <div class="manage-content">
+            <div class="manage-top">
+                <h1 class="manage-title">판매 관리</h1>
+                <div class="date-control">
+                    <label class="date-label" for="salesDate">조회일</label>
+                    <input class="date-input" id="salesDate" type="date">
+                </div>
+            </div>
+            <div class="daily-summary">
+                <div class="daily-label">오늘의 매출</div>
+                <div class="daily-amount" id="dailyTotal">0원</div>
+                <div class="daily-count" id="dailyCount">매출 인정 0건 / 전체 주문 0건</div>
+            </div>
+            <div class="section-label">주문 내역</div>
+            <div class="order-history" id="orderHistory">
+                <div class="history-empty">아직 주문 내역이 없습니다</div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script src="/js/pos/manage.js"></script>
+</body>
+</html>

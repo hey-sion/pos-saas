@@ -1,0 +1,38 @@
+package com.sion.pos.interfaces.api.order;
+
+import com.sion.pos.application.order.OrderUpdateItemsCommand;
+import com.sion.pos.application.order.OrderItemLine;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import java.util.List;
+
+public record OrderUpdateItemsRequest(
+        @NotEmpty(message = "주문 항목이 비어 있습니다.")
+        List<@Valid Line> items
+) {
+
+    public OrderUpdateItemsCommand toCommand() {
+        return new OrderUpdateItemsCommand(
+                items.stream()
+                     .map(Line::toCommand)
+                     .toList()
+        );
+    }
+
+    public record Line(
+            @NotNull(message = "menuId는 필수입니다.")
+            @Positive(message = "menuId는 1 이상이어야 합니다.")
+            Long menuId,
+
+            @NotNull(message = "quantity는 필수입니다.")
+            @Positive(message = "quantity는 1 이상이어야 합니다.")
+            Integer quantity
+    ) {
+
+        private OrderItemLine toCommand() {
+            return new OrderItemLine(menuId, quantity);
+        }
+    }
+}

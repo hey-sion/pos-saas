@@ -8,10 +8,12 @@ services:
     container_name: pos-saas-app
     ports:
       - "8080:8080"
+    env_file:
+      - ../.env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/pos_saas?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
-      SPRING_DATASOURCE_USERNAME: pos
-      SPRING_DATASOURCE_PASSWORD: pos
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SERVER_PORT: 8080
     depends_on:
@@ -24,10 +26,10 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MYSQL_DATABASE: pos_saas
-      MYSQL_USER: pos
-      MYSQL_PASSWORD: pos
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       TZ: Asia/Seoul
     command:
       - --character-set-server=utf8mb4
@@ -35,7 +37,7 @@ services:
     volumes:
       - pos-saas-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD"]
       interval: 5s
       timeout: 3s
       retries: 20
