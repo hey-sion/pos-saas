@@ -227,6 +227,110 @@ class PaymentFacadeIntegrationTest {
         }
     }
 
+    @Nested
+    @DisplayName("PortOne 웹훅 처리 시, ")
+    class HandlePortOneWebhook {
+
+        @Test
+        @DisplayName("PENDING 결제에 PAID 결과가 오면 COMPLETED로 전이한다")
+        void completesPaymentWhenWebhookPaid() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-webhook", null));
+
+            paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId());
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(persisted.getPaidAt()).isNotNull(),
+                    () -> assertThat(persisted.getPgTransactionKey()).isEqualTo("tx-webhook")
+            );
+        }
+
+        @Test
+        @DisplayName("PENDING 결제에 FAILED 결과가 오면 FAILED로 전이한다")
+        void failsPaymentWhenWebhookFailed() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.FAILED, null, null, "한도 초과"));
+
+            paymentFacade.handlePortOneWebhook("Transaction.Failed", created.pg().paymentId());
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.FAILED),
+                    () -> assertThat(persisted.getFailReason()).isEqualTo("한도 초과")
+            );
+        }
+
+        @Test
+        @DisplayName("PG 재조회 결과가 PENDING이면 상태를 유지한다")
+        void keepsPendingWhenGatewayPending() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PENDING, null, null, null));
+
+            paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId());
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertThat(persisted.getStatus()).isEqualTo(Payment.Status.PENDING);
+        }
+
+        @Test
+        @DisplayName("이미 COMPLETED된 결제는 PG 재조회 없이 무시한다")
+        void ignoresAlreadyCompletedPaymentWithoutLookup() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+            paymentFacade.verify(created.paymentId());
+            fakePaymentGateway.clear();
+
+            assertThatCode(() -> paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId()))
+                    .doesNotThrowAnyException();
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertThat(persisted.getStatus()).isEqualTo(Payment.Status.COMPLETED);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 pgPaymentId면 예외 없이 반환한다")
+        void returnsQuietlyWhenPaymentNotFound() {
+            assertThatCode(() -> paymentFacade.handlePortOneWebhook("Transaction.Paid", "unknown-payment-id"))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("처리 대상이 아닌 type이면 PG 재조회 없이 무시한다")
+        void ignoresUnhandledType() {
+            PaymentCreateInfo created = createPgPayment();
+
+            assertThatCode(() -> paymentFacade.handlePortOneWebhook("Transaction.Cancelled", created.pg().paymentId()))
+                    .doesNotThrowAnyException();
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertThat(persisted.getStatus()).isEqualTo(Payment.Status.PENDING);
+        }
+
+        @Test
+        @DisplayName("결제 금액이 일치하지 않으면 PENDING을 유지한다")
+        void keepsPendingWhenAmountMismatched() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE + 1_000, "tx-abc", null));
+
+            assertThatCode(() -> paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId()))
+                    .doesNotThrowAnyException();
+
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.PENDING),
+                    () -> assertThat(persisted.getPaidAt()).isNull(),
+                    () -> assertThat(persisted.getPgTransactionKey()).isNull()
+            );
+        }
+    }
+
     private Order createOrderWith(Long menuId, int quantity) {
         return orderFacade.createOrder(new OrderCreateCommand(
                 storeId,

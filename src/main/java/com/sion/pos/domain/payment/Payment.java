@@ -102,7 +102,7 @@ public class Payment extends BaseEntity {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "paidAt은 필수입니다.");
         }
 
-        if (this.status != Status.PENDING) {
+        if (!isPending()) {
             throw new PosApplicationException(ErrorType.CONFLICT,
                     "결제 대기 상태에서만 완료 처리 가능합니다. 현재 상태: " + this.status);
         }
@@ -113,13 +113,21 @@ public class Payment extends BaseEntity {
     }
 
     public void fail(String reason) {
-        if (this.status != Status.PENDING) {
+        if (!isPending()) {
             throw new PosApplicationException(ErrorType.CONFLICT,
                     "결제 대기 상태에서만 실패 처리 가능합니다. 현재 상태: " + this.status);
         }
 
         this.status = Status.FAILED;
         this.failReason = reason;
+    }
+
+    public boolean isPgChannel() {
+        return this.channel == Channel.PG;
+    }
+
+    public boolean isPending() {
+        return this.status == Status.PENDING;
     }
 
     public boolean matchesAmount(Integer amount) {

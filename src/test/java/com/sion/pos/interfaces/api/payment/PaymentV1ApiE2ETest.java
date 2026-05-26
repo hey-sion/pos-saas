@@ -19,6 +19,7 @@ import com.sion.pos.support.DatabaseCleanUp;
 import com.sion.pos.support.portone.FakePaymentGateway;
 import com.sion.pos.support.portone.FakePaymentGatewayConfig;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -245,6 +246,63 @@ class PaymentV1ApiE2ETest {
 
         private String verifyEndpoint(Long paymentId) {
             return ENDPOINT + "/" + paymentId + "/verify";
+        }
+    }
+
+    @Nested
+    @DisplayName("결제 웹훅 호출 시, ")
+    class Webhook {
+
+        private static final String WEBHOOK_ENDPOINT = ENDPOINT + "/webhook/portone";
+
+        @Test
+        @DisplayName("처리 여부와 무관하게 200 OK를 즉시 반환한다.")
+        void returnsOk_immediately() {
+            PaymentCreateResponse created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+
+            ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
+                    new HttpEntity<>(webhookBody("Transaction.Paid", created.pg().paymentId())), Void.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @Test
+        @DisplayName("pgPaymentId 기준 결제 상태가 PG 결과로 반영된다.")
+        void reflectsGatewayResult() {
+            PaymentCreateResponse created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+
+            testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
+                    new HttpEntity<>(webhookBody("Transaction.Paid", created.pg().paymentId())), Void.class);
+
+            Payment persisted = paymentRepository.findById(created.payment().id()).orElseThrow();
+            assertAll(
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(persisted.getPgTransactionKey()).isEqualTo("tx-abc")
+            );
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 paymentId라도 200 OK로 응답한다.")
+        void returnsOk_whenPaymentNotFound() {
+            ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
+                    new HttpEntity<>(webhookBody("Transaction.Paid", "unknown-payment-id")), Void.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        private PaymentCreateResponse createPgPayment() {
+            Order order = createOrder(americanoId, 1);
+            return testRestTemplate.postForObject(ENDPOINT,
+                    new PaymentCreateRequest(order.getId(), Payment.Method.EASY_PAY, Payment.Provider.KAKAO_PAY),
+                    PaymentCreateResponse.class);
+        }
+
+        private Map<String, Object> webhookBody(String type, String pgPaymentId) {
+            return Map.of("type", type, "data", Map.of("paymentId", pgPaymentId));
         }
     }
 

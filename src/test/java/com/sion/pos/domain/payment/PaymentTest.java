@@ -74,6 +74,31 @@ class PaymentTest {
         }
     }
 
+    @Nested
+    @DisplayName("상태 질의 시, ")
+    class StateQuery {
+
+        @Test
+        @DisplayName("PG 결제는 isPgChannel이 true, 오프라인 결제는 false다")
+        void answersIsPgChannel() {
+            Payment pg = Payment.createPg(ORDER_ID, Payment.Provider.KAKAO_PAY, AMOUNT, "pg-123");
+            Payment offline = Payment.createOffline(ORDER_ID, Payment.Method.CASH, AMOUNT, PAID_AT);
+
+            assertThat(pg.isPgChannel()).isTrue();
+            assertThat(offline.isPgChannel()).isFalse();
+        }
+
+        @Test
+        @DisplayName("생성 직후 PG 결제는 isPending이 true, 완료된 결제는 false다")
+        void answersIsPending() {
+            Payment pending = Payment.createPg(ORDER_ID, Payment.Provider.KAKAO_PAY, AMOUNT, "pg-123");
+            Payment completed = Payment.createOffline(ORDER_ID, Payment.Method.CASH, AMOUNT, PAID_AT);
+
+            assertThat(pending.isPending()).isTrue();
+            assertThat(completed.isPending()).isFalse();
+        }
+    }
+
     private static void expects(ErrorType expected, ThrowingCallable callable) {
         assertThatThrownBy(callable).isInstanceOfSatisfying(PosApplicationException.class,
                                     e -> assertThat(e.getErrorType()).isEqualTo(expected));
