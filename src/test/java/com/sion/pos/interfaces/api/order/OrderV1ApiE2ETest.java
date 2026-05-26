@@ -3,6 +3,7 @@ package com.sion.pos.interfaces.api.order;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+import com.sion.pos.application.store.StoreAccountService;
 import com.sion.pos.interfaces.api.ApiResponse;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
@@ -15,6 +16,7 @@ import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.DatabaseCleanUp;
+import com.sion.pos.support.security.ApiTestClient;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
@@ -39,14 +42,16 @@ class OrderV1ApiE2ETest {
     private static final int AMERICANO_PRICE = 4_000;
     private static final int LATTE_PRICE = 5_000;
 
-    @Autowired private TestRestTemplate testRestTemplate;
+    @LocalServerPort private int port;
     @Autowired private StoreRepository storeRepository;
     @Autowired private MenuRepository menuRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private OrderItemRepository orderItemRepository;
     @Autowired private PaymentRepository paymentRepository;
+    @Autowired private StoreAccountService storeAccountService;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
+    private TestRestTemplate testRestTemplate;
     private Long storeId;
     private Long americanoId;
     private Long latteId;
@@ -57,6 +62,8 @@ class OrderV1ApiE2ETest {
         storeId = store.getId();
         americanoId = menuRepository.save(Menu.create(storeId, "아메리카노", AMERICANO_PRICE, 1)).getId();
         latteId = menuRepository.save(Menu.create(storeId, "라떼", LATTE_PRICE, 2)).getId();
+        storeAccountService.register(storeId, "owner", "password1!");
+        testRestTemplate = ApiTestClient.loggedIn(port, "owner", "password1!");
     }
 
     @AfterEach

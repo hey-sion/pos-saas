@@ -26,15 +26,15 @@ class StoreAccountRepositoryTest {
     }
 
     @Nested
-    @DisplayName("계정명으로 조회 시, ")
-    class FindByAccountName {
+    @DisplayName("로그인 ID로 조회 시, ")
+    class FindByLoginId {
 
         @Test
         @DisplayName("삭제되지 않은 계정을 찾는다")
         void findsActiveAccount() {
             storeAccountRepository.save(StoreAccount.create(STORE_ID, "smile-cafe", PASSWORD_HASH));
 
-            Optional<StoreAccount> found = storeAccountRepository.findByAccountNameAndDeletedAtIsNull("smile-cafe");
+            Optional<StoreAccount> found = storeAccountRepository.findByLoginIdAndDeletedAtIsNull("smile-cafe");
 
             assertThat(found).isPresent();
             assertThat(found.get().getStoreId()).isEqualTo(STORE_ID);
@@ -47,15 +47,15 @@ class StoreAccountRepositoryTest {
             account.delete();
             storeAccountRepository.save(account);
 
-            Optional<StoreAccount> found = storeAccountRepository.findByAccountNameAndDeletedAtIsNull("smile-cafe");
+            Optional<StoreAccount> found = storeAccountRepository.findByLoginIdAndDeletedAtIsNull("smile-cafe");
 
             assertThat(found).isEmpty();
         }
 
         @Test
-        @DisplayName("존재하지 않는 계정명이면 빈 Optional을 반환한다")
+        @DisplayName("존재하지 않는 로그인 ID면 빈 Optional을 반환한다")
         void returnsEmptyWhenNotExists() {
-            Optional<StoreAccount> found = storeAccountRepository.findByAccountNameAndDeletedAtIsNull("nobody");
+            Optional<StoreAccount> found = storeAccountRepository.findByLoginIdAndDeletedAtIsNull("nobody");
 
             assertThat(found).isEmpty();
         }

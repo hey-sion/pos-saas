@@ -20,19 +20,19 @@ public class StoreAccount extends BaseEntity {
     @Column(name = "store_id", nullable = false)
     private Long storeId;
 
-    @Column(name = "account_name", nullable = false, length = 50)
-    private String accountName;
+    @Column(name = "login_id", nullable = false, length = 50)
+    private String loginId;
 
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
-    public static StoreAccount create(Long storeId, String accountName, String passwordHash) {
+    public static StoreAccount create(Long storeId, String loginId, String passwordHash) {
         if (storeId == null) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "storeId는 필수입니다.");
         }
 
-        if (accountName == null || accountName.isBlank()) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "accountName은 필수입니다.");
+        if (loginId == null || loginId.isBlank()) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "loginId는 필수입니다.");
         }
 
         if (passwordHash == null || passwordHash.isBlank()) {
@@ -41,7 +41,7 @@ public class StoreAccount extends BaseEntity {
 
         StoreAccount account = new StoreAccount();
         account.storeId = storeId;
-        account.accountName = normalize(accountName);
+        account.loginId = normalize(loginId);
         account.passwordHash = passwordHash;
 
         return account;
@@ -50,7 +50,7 @@ public class StoreAccount extends BaseEntity {
     /**
      * 로그인 ID 정규화 규칙. 저장(생성)과 조회(로그인) 양쪽에서 동일하게 적용해야 unique/매칭이 일관된다.
      */
-    public static String normalize(String accountName) {
-        return accountName.strip().toLowerCase(Locale.ROOT);
+    public static String normalize(String loginId) {
+        return loginId.strip().toLowerCase(Locale.ROOT);
     }
 }

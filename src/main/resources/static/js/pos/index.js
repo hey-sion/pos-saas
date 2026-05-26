@@ -13,6 +13,24 @@ const state = {
 
 const formatPrice = (price) => new Intl.NumberFormat("ko-KR").format(price) + "원";
 
+function getCookie(name) {
+    return document.cookie
+        .split("; ")
+        .find((row) => row.startsWith(`${name}=`))
+        ?.split("=")[1];
+}
+
+function jsonHeaders() {
+    const csrfToken = getCookie("XSRF-TOKEN");
+    const headers = {"Content-Type": "application/json"};
+
+    if (csrfToken) {
+        headers["X-XSRF-TOKEN"] = decodeURIComponent(csrfToken);
+    }
+
+    return headers;
+}
+
 function loadBusinessDate() {
     const today = new Intl.DateTimeFormat("ko-KR", {
         year: "numeric",
@@ -250,7 +268,7 @@ async function createOrder() {
 
     const response = await fetch("/api/v1/orders", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: jsonHeaders(),
         body: JSON.stringify(payload)
     });
 
@@ -271,7 +289,7 @@ async function updateOrderItems(orderId) {
 
     const response = await fetch(`/api/v1/orders/${orderId}/items`, {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
+        headers: jsonHeaders(),
         body: JSON.stringify(payload)
     });
 
@@ -290,7 +308,7 @@ async function createPayment(method, provider) {
 
     const response = await fetch("/api/v1/payments", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: jsonHeaders(),
         body: JSON.stringify(payload)
     });
 
@@ -387,7 +405,7 @@ async function requestPortOne(pg) {
 async function verifyPayment(paymentId) {
     const response = await fetch(`/api/v1/payments/${paymentId}/verify`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"}
+        headers: jsonHeaders()
     });
 
     if (!response.ok) {
@@ -602,7 +620,7 @@ async function cancelSelectedWaitingOrder() {
 async function updateOrderStatus(orderId, status) {
     const response = await fetch(`/api/v1/orders/${orderId}/status`, {
         method: "PATCH",
-        headers: {"Content-Type": "application/json"},
+        headers: jsonHeaders(),
         body: JSON.stringify({status})
     });
 

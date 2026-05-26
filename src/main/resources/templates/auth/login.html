@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SmilePOS 로그인</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f5f6f8;
+            --white: #ffffff;
+            --gray-50: #f9fafb;
+            --gray-100: #f2f4f6;
+            --gray-200: #e5e8eb;
+            --gray-300: #d1d6db;
+            --gray-400: #b0b8c1;
+            --gray-500: #8b95a1;
+            --gray-600: #6b7684;
+            --gray-700: #4e5968;
+            --gray-800: #333d4b;
+            --gray-900: #191f28;
+            --blue-50: #e8f3ff;
+            --blue-500: #3182f6;
+            --blue-600: #1b64da;
+            --green-50: #e8faf5;
+            --green-600: #1aab6e;
+            --red-50: #fff0f0;
+            --red-500: #f44336;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 8px 24px rgba(25,31,40,0.08);
+            --font: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: var(--font);
+            color: var(--gray-900);
+            background: var(--bg);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .login-shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(460px, 3fr);
+        }
+
+        .brand-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 32px;
+            background: var(--white);
+            border-right: 1px solid var(--gray-200);
+        }
+
+        .brand-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+
+        .logo-mark {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            background: var(--blue-500);
+            color: var(--white);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 800;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .brand-copy {
+            width: 100%;
+            margin: auto 0;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            height: 28px;
+            padding: 0 10px;
+            border-radius: 99px;
+            background: var(--blue-50);
+            color: var(--blue-500);
+            font-size: 12px;
+            font-weight: 800;
+            margin-bottom: 18px;
+        }
+
+        .brand-title {
+            font-size: 42px;
+            line-height: 1.18;
+            font-weight: 800;
+            color: var(--gray-900);
+            letter-spacing: 0;
+            margin-bottom: 16px;
+        }
+
+        .brand-description {
+            font-size: 16px;
+            line-height: 1.65;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        .login-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+        }
+
+        .login-card {
+            width: min(100%, 420px);
+            padding: 30px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md);
+            background: var(--white);
+            box-shadow: var(--shadow-md);
+        }
+
+        .login-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            font-size: 14px;
+            line-height: 1.55;
+            color: var(--gray-500);
+            font-weight: 600;
+            margin-bottom: 22px;
+        }
+
+        .message {
+            display: flex;
+            align-items: center;
+            min-height: 40px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .message.error {
+            background: var(--red-50);
+            color: var(--red-500);
+            border: 1px solid #ffc8c8;
+        }
+
+        .message.success {
+            background: var(--blue-50);
+            color: var(--blue-500);
+            border: 1px solid #c9e2ff;
+        }
+
+        .login-form {
+            display: grid;
+            gap: 14px;
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+        }
+
+        .field-label {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--gray-700);
+        }
+
+        .field-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: var(--white);
+            color: var(--gray-900);
+            font: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+        }
+
+        .field-input::placeholder {
+            color: var(--gray-400);
+            font-weight: 500;
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: var(--blue-500);
+            box-shadow: 0 0 0 3px rgba(49,130,246,0.12);
+        }
+
+        .submit-btn {
+            width: 100%;
+            height: 52px;
+            margin-top: 8px;
+            border: 1px solid var(--blue-500);
+            border-radius: var(--radius-sm);
+            background: var(--blue-500);
+            color: var(--white);
+            font: inherit;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s, transform 0.12s;
+        }
+
+        .submit-btn:hover {
+            background: var(--blue-600);
+            border-color: var(--blue-600);
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .login-footnote {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid var(--gray-200);
+            color: var(--gray-500);
+            font-size: 12px;
+            line-height: 1.5;
+            font-weight: 600;
+        }
+
+        @media (max-width: 860px) {
+            .login-shell {
+                grid-template-columns: 1fr;
+            }
+
+            .brand-panel {
+                padding: 24px 20px 0;
+                border-right: 0;
+                background: var(--bg);
+            }
+
+            .brand-copy {
+                margin-top: 44px;
+                margin-bottom: 0;
+            }
+
+            .brand-title {
+                font-size: 30px;
+            }
+
+            .brand-description {
+                display: none;
+            }
+
+            .login-panel {
+                align-items: flex-start;
+                padding: 24px 20px 40px;
+            }
+
+            .login-card {
+                padding: 24px;
+                box-shadow: var(--shadow-sm);
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="login-shell">
+    <section class="brand-panel" aria-label="SmilePOS">
+        <div class="brand-logo">
+            <span class="logo-mark">S</span>
+            <span>SmilePOS</span>
+        </div>
+
+        <div class="brand-copy">
+            <div class="eyebrow">SMILE POS</div>
+            <h1 class="brand-title">오늘도 활기차게!</h1>
+            <p class="brand-description">
+                로그인 후 매장의 주문, 메뉴, 결제 내역을 조회하고 처리할 수 있는 POS로 연결됩니다.
+            </p>
+        </div>
+
+    </section>
+
+    <section class="login-panel">
+        <div class="login-card">
+            <h2 class="login-title">로그인</h2>
+            <p class="login-subtitle">발급받은 매장 계정으로 POS와 관리 화면에 접속하세요.</p>
+
+            <p class="message error" th:if="${param.error}">계정 또는 비밀번호가 올바르지 않습니다.</p>
+            <p class="message success" th:if="${param.logout}">로그아웃되었습니다.</p>
+
+            <form class="login-form" action="/login" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                <label class="field">
+                    <span class="field-label">계정</span>
+                    <input class="field-input" type="text" name="username" autocomplete="username"
+                           placeholder="매장 계정" required autofocus/>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">비밀번호</span>
+                    <input class="field-input" type="password" name="password" autocomplete="current-password"
+                           placeholder="비밀번호" required/>
+                </label>
+
+                <button class="submit-btn" type="submit">로그인</button>
+            </form>
+
+            <p class="login-footnote">접속 후 모든 주문과 결제 처리는 로그인한 매장 기준으로 기록됩니다.</p>
+        </div>
+    </section>
+</main>
+</body>
+</html>

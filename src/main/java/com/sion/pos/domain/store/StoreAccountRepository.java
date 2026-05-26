@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface StoreAccountRepository extends JpaRepository<StoreAccount, Long> {
 
-    Optional<StoreAccount> findByAccountNameAndDeletedAtIsNull(String accountName);
+    Optional<StoreAccount> findByLoginIdAndDeletedAtIsNull(String loginId);
 }

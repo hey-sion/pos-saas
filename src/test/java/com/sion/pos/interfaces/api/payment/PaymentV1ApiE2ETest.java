@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.sion.pos.application.order.OrderCreateCommand;
 import com.sion.pos.application.order.OrderFacade;
 import com.sion.pos.application.order.OrderItemLine;
+import com.sion.pos.application.store.StoreAccountService;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
@@ -16,6 +17,7 @@ import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.interfaces.api.ApiResponse;
 import com.sion.pos.support.DatabaseCleanUp;
+import com.sion.pos.support.security.ApiTestClient;
 import com.sion.pos.support.portone.FakePaymentGateway;
 import com.sion.pos.support.portone.FakePaymentGatewayConfig;
 import com.sion.pos.support.portone.PortOneProperties;
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -51,15 +54,17 @@ class PaymentV1ApiE2ETest {
     private static final String ENDPOINT = "/api/v1/payments";
     private static final int AMERICANO_PRICE = 4_000;
 
-    @Autowired private TestRestTemplate testRestTemplate;
+    @LocalServerPort private int port;
     @Autowired private OrderFacade orderFacade;
     @Autowired private StoreRepository storeRepository;
     @Autowired private MenuRepository menuRepository;
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private FakePaymentGateway fakePaymentGateway;
     @Autowired private PortOneProperties portOneProperties;
+    @Autowired private StoreAccountService storeAccountService;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
+    private TestRestTemplate testRestTemplate;
     private Long storeId;
     private Long americanoId;
 
@@ -68,6 +73,8 @@ class PaymentV1ApiE2ETest {
         Store store = storeRepository.save(Store.create("1번 테스트 매장", "010-1234-5678"));
         storeId = store.getId();
         americanoId = menuRepository.save(Menu.create(storeId, "아메리카노", AMERICANO_PRICE, 1)).getId();
+        storeAccountService.register(storeId, "owner", "password1!");
+        testRestTemplate = ApiTestClient.loggedIn(port, "owner", "password1!");
     }
 
     @AfterEach
