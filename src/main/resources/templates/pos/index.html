@@ -92,11 +92,34 @@
         .header-right {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             font-size: 13px;
             color: var(--gray-600);
             font-weight: 500;
         }
+        .logout-form {
+            display: inline-flex;
+            align-items: center;
+        }
+        .logout-btn {
+            height: 32px;
+            padding: 0 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            color: var(--gray-600);
+            font: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.12s;
+        }
+        .logout-btn:hover {
+            background: var(--gray-50);
+            color: var(--gray-800);
+            border-color: var(--gray-300);
+        }
+        .logout-btn:active { transform: scale(0.97); }
 
         /* ── Main Layout ── */
         .main {
@@ -770,7 +793,10 @@
     </div>
     <div class="header-right">
         <span id="storeName">매장명: -</span>
-        <span id="businessDate"></span>
+        <form class="logout-form" action="/logout" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button class="logout-btn" type="submit">로그아웃</button>
+        </form>
     </div>
 </header>
 

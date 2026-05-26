@@ -8,6 +8,9 @@ import com.sion.pos.application.store.StoreAccountService;
 import com.sion.pos.support.DatabaseCleanUp;
 import com.sion.pos.support.portone.PortOneProperties;
 import com.sion.pos.support.security.ApiTestClient;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
@@ -136,6 +139,99 @@ class SecurityE2ETest {
             assertThat(response.getStatusCode().is3xxRedirection()).isTrue();
             assertThat(response.getHeaders().getLocation().toString()).contains("error");
         }
+
+        @Test
+        @DisplayName("로그아웃 후 보호 페이지 접근시 로그인 페이지로 리다이렉트된다.")
+        void redirectsToLoginAfterLogout() {
+            Store store = storeRepository.save(Store.create("테스트 매장", "010-0000-0000"));
+            storeAccountService.register(store.getId(), "owner", PASSWORD);
+
+            TestRestTemplate rest = ApiTestClient.plain(port);
+            Map<String, String> cookies = loginAndLoadMainPage(rest, "owner", PASSWORD);
+
+            ResponseEntity<Void> logoutResult = logout(rest, cookies);
+            assertThat(logoutResult.getStatusCode().is3xxRedirection()).isTrue();
+            assertThat(logoutResult.getHeaders().getLocation().toString()).endsWith("/login");
+
+            ResponseEntity<String> protectedPage = getWithCookies(rest, "/", cookies);
+            assertThat(protectedPage.getStatusCode().is3xxRedirection()).isTrue();
+            assertThat(protectedPage.getHeaders().getLocation().toString()).contains("/login");
+        }
+    }
+
+    private Map<String, String> loginAndLoadMainPage(TestRestTemplate rest, String username, String password) {
+        ResponseEntity<String> loginPage = rest.getForEntity("/login", String.class);
+        Map<String, String> cookies = parseSetCookies(loginPage.getHeaders());
+        String csrf = cookies.get("XSRF-TOKEN");
+
+        HttpHeaders loginHeaders = new HttpHeaders();
+        loginHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        loginHeaders.add(HttpHeaders.COOKIE, cookieHeader(cookies));
+        MultiValueMap<String, String> loginForm = new LinkedMultiValueMap<>();
+        loginForm.add("username", username);
+        loginForm.add("password", password);
+        loginForm.add("_csrf", csrf);
+
+        ResponseEntity<Void> loginResult =
+                rest.exchange("/login", HttpMethod.POST, new HttpEntity<>(loginForm, loginHeaders), Void.class);
+        assertThat(loginResult.getStatusCode().is3xxRedirection()).isTrue();
+        cookies.putAll(parseSetCookies(loginResult.getHeaders()));
+        cookies.remove("XSRF-TOKEN");
+
+        ResponseEntity<String> mainPage = getWithCookies(rest, "/", cookies);
+        assertThat(mainPage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        cookies.putAll(parseSetCookies(mainPage.getHeaders()));
+
+        return cookies;
+    }
+
+    private ResponseEntity<Void> logout(TestRestTemplate rest, Map<String, String> cookies) {
+        HttpHeaders logoutHeaders = new HttpHeaders();
+        logoutHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        logoutHeaders.add(HttpHeaders.COOKIE, cookieHeader(cookies));
+        MultiValueMap<String, String> logoutForm = new LinkedMultiValueMap<>();
+        logoutForm.add("_csrf", cookies.get("XSRF-TOKEN"));
+
+        return rest.exchange("/logout", HttpMethod.POST, new HttpEntity<>(logoutForm, logoutHeaders), Void.class);
+    }
+
+    private ResponseEntity<String> getWithCookies(TestRestTemplate rest, String path, Map<String, String> cookies) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE, cookieHeader(cookies));
+
+        return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+    }
+
+    private Map<String, String> parseSetCookies(HttpHeaders headers) {
+        Map<String, String> cookies = new LinkedHashMap<>();
+        List<String> setCookies = headers.get(HttpHeaders.SET_COOKIE);
+
+        if (setCookies == null) {
+            return cookies;
+        }
+
+        for (String setCookie : setCookies) {
+            String pair = setCookie.split(";", 2)[0];
+            int eq = pair.indexOf('=');
+            if (eq <= 0) {
+                continue;
+            }
+
+            String name = pair.substring(0, eq).trim();
+            String value = pair.substring(eq + 1).trim();
+            if (!value.isEmpty()) {
+                cookies.put(name, value);
+            }
+        }
+
+        return cookies;
+    }
+
+    private String cookieHeader(Map<String, String> cookies) {
+        return cookies.entrySet().stream()
+                      .map(e -> e.getKey() + "=" + e.getValue())
+                      .reduce((a, b) -> a + "; " + b)
+                      .orElse("");
     }
 
     private HttpHeaders signedHeaders(String body) {

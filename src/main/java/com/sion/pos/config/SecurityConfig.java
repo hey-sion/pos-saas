@@ -49,7 +49,7 @@ public class SecurityConfig {
                         .permitAll()
                 )
                 .logout(logout -> logout
-                        .logoutSuccessUrl("/login?logout")
+                        .logoutSuccessUrl("/login")
                         .permitAll()
                 )
                 // 인증 안 된 API 호출은 로그인 페이지로 리다이렉트하지 말고 401을 준다(JSON 클라이언트용). 페이지는 기본 로그인 리다이렉트 유지.

@@ -2,16 +2,6 @@ const STORE_ID = 1;
 
 const formatPrice = (price) => new Intl.NumberFormat("ko-KR").format(price) + "원";
 
-function loadBusinessDate() {
-    const today = new Intl.DateTimeFormat("ko-KR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit"
-    }).format(new Date());
-
-    document.getElementById("businessDate").textContent = `영업일: ${today}`;
-}
-
 function todayIsoDate() {
     const now = new Date();
     const year = now.getFullYear();
@@ -156,7 +146,6 @@ function formatOrderStatus(status) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadBusinessDate();
     initializeSalesDate();
     loadStore();
     loadDailySummary();

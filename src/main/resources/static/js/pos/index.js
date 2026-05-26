@@ -31,16 +31,6 @@ function jsonHeaders() {
     return headers;
 }
 
-function loadBusinessDate() {
-    const today = new Intl.DateTimeFormat("ko-KR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit"
-    }).format(new Date());
-
-    document.getElementById("businessDate").textContent = `영업일: ${today}`;
-}
-
 async function loadStore() {
     const storeName = document.getElementById("storeName");
 
@@ -702,7 +692,6 @@ function bindEvents() {
 
 document.addEventListener("DOMContentLoaded", () => {
     bindEvents();
-    loadBusinessDate();
     loadStore();
     loadMenus();
     renderCart();

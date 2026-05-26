@@ -303,7 +303,6 @@
             <p class="login-subtitle">발급받은 매장 계정으로 POS와 관리 화면에 접속하세요.</p>
 
             <p class="message error" th:if="${param.error}">계정 또는 비밀번호가 올바르지 않습니다.</p>
-            <p class="message success" th:if="${param.logout}">로그아웃되었습니다.</p>
 
             <form class="login-form" action="/login" method="post">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
