@@ -11,6 +11,7 @@ public record PortOneProperties(
         String storeId,
         String apiSecret,
         String apiBaseUrl,
+        String webhookSecret,
         Map<String, String> channelKeys
 ) {
 
@@ -21,8 +22,7 @@ public record PortOneProperties(
 
         String key = channelKeys != null ? channelKeys.get(provider.name()) : null;
         if (key == null || key.isBlank()) {
-            throw new PosApplicationException(ErrorType.INTERNAL_ERROR,
-                    "PortOne 채널 키가 설정되지 않았습니다: " + provider);
+            throw new PosApplicationException(ErrorType.INTERNAL_ERROR, "PortOne 채널 키가 설정되지 않았습니다: " + provider);
         }
 
         return key;

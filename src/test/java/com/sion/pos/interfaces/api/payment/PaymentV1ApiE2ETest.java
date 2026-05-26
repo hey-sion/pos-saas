@@ -18,8 +18,15 @@ import com.sion.pos.interfaces.api.ApiResponse;
 import com.sion.pos.support.DatabaseCleanUp;
 import com.sion.pos.support.portone.FakePaymentGateway;
 import com.sion.pos.support.portone.FakePaymentGatewayConfig;
+import com.sion.pos.support.portone.PortOneProperties;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,8 +38,10 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -48,6 +57,7 @@ class PaymentV1ApiE2ETest {
     @Autowired private MenuRepository menuRepository;
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private FakePaymentGateway fakePaymentGateway;
+    @Autowired private PortOneProperties portOneProperties;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
     private Long storeId;
@@ -256,14 +266,15 @@ class PaymentV1ApiE2ETest {
         private static final String WEBHOOK_ENDPOINT = ENDPOINT + "/webhook/portone";
 
         @Test
-        @DisplayName("처리 여부와 무관하게 200 OK를 즉시 반환한다.")
-        void returnsOk_immediately() {
+        @DisplayName("유효한 서명이면 200 OK를 즉시 반환한다.")
+        void returnsOk_whenSignatureValid() {
             PaymentCreateResponse created = createPgPayment();
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+            String body = webhookJson("Transaction.Paid", created.pg().paymentId());
 
             ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
-                    new HttpEntity<>(webhookBody("Transaction.Paid", created.pg().paymentId())), Void.class);
+                    new HttpEntity<>(body, signedHeaders(body)), Void.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
@@ -274,9 +285,10 @@ class PaymentV1ApiE2ETest {
             PaymentCreateResponse created = createPgPayment();
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+            String body = webhookJson("Transaction.Paid", created.pg().paymentId());
 
             testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
-                    new HttpEntity<>(webhookBody("Transaction.Paid", created.pg().paymentId())), Void.class);
+                    new HttpEntity<>(body, signedHeaders(body)), Void.class);
 
             Payment persisted = paymentRepository.findById(created.payment().id()).orElseThrow();
             assertAll(
@@ -286,10 +298,12 @@ class PaymentV1ApiE2ETest {
         }
 
         @Test
-        @DisplayName("존재하지 않는 paymentId라도 200 OK로 응답한다.")
+        @DisplayName("서명이 유효하면 존재하지 않는 paymentId라도 200 OK로 응답한다.")
         void returnsOk_whenPaymentNotFound() {
+            String body = webhookJson("Transaction.Paid", "unknown-payment-id");
+
             ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
-                    new HttpEntity<>(webhookBody("Transaction.Paid", "unknown-payment-id")), Void.class);
+                    new HttpEntity<>(body, signedHeaders(body)), Void.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
@@ -300,11 +314,38 @@ class PaymentV1ApiE2ETest {
             PaymentCreateResponse created = createPgPayment();
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+            String body = webhookJson("Transaction.Paid", created.pg().paymentId());
 
             ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT + "/", HttpMethod.POST,
-                    new HttpEntity<>(webhookBody("Transaction.Paid", created.pg().paymentId())), Void.class);
+                    new HttpEntity<>(body, signedHeaders(body)), Void.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @Test
+        @DisplayName("서명이 유효하지 않으면 401 Unauthorized를 반환한다.")
+        void returns401_whenSignatureInvalid() {
+            String body = webhookJson("Transaction.Paid", "any-payment-id");
+            HttpHeaders headers = signedHeaders(body);
+            headers.set("webhook-signature", "v1,aW52YWxpZHNpZ25hdHVyZQ==");
+
+            ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
+                    new HttpEntity<>(body, headers), Void.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName("서명 헤더가 없으면 401 Unauthorized를 반환한다.")
+        void returns401_whenHeadersMissing() {
+            String body = webhookJson("Transaction.Paid", "any-payment-id");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
+                    new HttpEntity<>(body, headers), Void.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
 
         private PaymentCreateResponse createPgPayment() {
@@ -314,8 +355,33 @@ class PaymentV1ApiE2ETest {
                     PaymentCreateResponse.class);
         }
 
-        private Map<String, Object> webhookBody(String type, String pgPaymentId) {
-            return Map.of("type", type, "data", Map.of("paymentId", pgPaymentId));
+        private String webhookJson(String type, String pgPaymentId) {
+            return "{\"type\":\"" + type + "\",\"data\":{\"paymentId\":\"" + pgPaymentId + "\"}}";
+        }
+
+        private HttpHeaders signedHeaders(String body) {
+            String msgId = "msg_" + UUID.randomUUID().toString().replace("-", "");
+            String timestamp = String.valueOf(Instant.now().getEpochSecond());
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("webhook-id", msgId);
+            headers.set("webhook-timestamp", timestamp);
+            headers.set("webhook-signature", sign(msgId, timestamp, body));
+            return headers;
+        }
+
+        private String sign(String msgId, String timestamp, String body) {
+            try {
+                String secret = portOneProperties.webhookSecret();
+                byte[] key = Base64.getDecoder().decode(
+                        secret.startsWith("whsec_") ? secret.substring("whsec_".length()) : secret);
+                Mac mac = Mac.getInstance("HmacSHA256");
+                mac.init(new SecretKeySpec(key, "HmacSHA256"));
+                byte[] signature = mac.doFinal((msgId + "." + timestamp + "." + body).getBytes(StandardCharsets.UTF_8));
+                return "v1," + Base64.getEncoder().encodeToString(signature);
+            } catch (GeneralSecurityException e) {
+                throw new IllegalStateException(e);
+            }
         }
     }
 
