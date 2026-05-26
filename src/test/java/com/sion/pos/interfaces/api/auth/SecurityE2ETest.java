@@ -2,6 +2,8 @@ package com.sion.pos.interfaces.api.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.sion.pos.domain.menu.Menu;
+import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.application.store.StoreAccountService;
@@ -42,6 +44,7 @@ class SecurityE2ETest {
 
     @LocalServerPort private int port;
     @Autowired private StoreRepository storeRepository;
+    @Autowired private MenuRepository menuRepository;
     @Autowired private StoreAccountService storeAccountService;
     @Autowired private PortOneProperties portOneProperties;
     @Autowired private DatabaseCleanUp databaseCleanUp;
@@ -76,7 +79,7 @@ class SecurityE2ETest {
         @DisplayName("보호된 API는 401 Unauthorized를 반환한다.")
         void protectedApiReturnsUnauthorized() {
             ResponseEntity<String> response = ApiTestClient.plain(port)
-                    .getForEntity("/api/v1/orders/waiting?storeId=1", String.class);
+                    .getForEntity("/api/v1/orders/waiting", String.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
@@ -106,9 +109,31 @@ class SecurityE2ETest {
 
             TestRestTemplate client = ApiTestClient.loggedIn(port, "owner", PASSWORD);
             ResponseEntity<String> response =
-                    client.getForEntity("/api/v1/orders/waiting?storeId=" + store.getId(), String.class);
+                    client.getForEntity("/api/v1/orders/waiting", String.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        @Test
+        @DisplayName("로그인한 매장의 매장 정보와 메뉴만 조회된다.")
+        void returnsOnlyLoggedInStoreData() {
+            Store firstStore = storeRepository.save(Store.create("1번 테스트 매장", "010-1111-1111"));
+            Store secondStore = storeRepository.save(Store.create("2번 테스트 매장", "010-2222-2222"));
+            menuRepository.save(Menu.create(firstStore.getId(), "1번 메뉴", 1_000, 1));
+            menuRepository.save(Menu.create(secondStore.getId(), "2번 메뉴", 2_000, 1));
+            storeAccountService.register(secondStore.getId(), "second-owner", PASSWORD);
+
+            TestRestTemplate client = ApiTestClient.loggedIn(port, "second-owner", PASSWORD);
+
+            ResponseEntity<String> storeResponse = client.getForEntity("/api/stores/me", String.class);
+            ResponseEntity<String> menuResponse = client.getForEntity("/api/menus", String.class);
+
+            assertThat(storeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(storeResponse.getBody()).contains("2번 테스트 매장");
+            assertThat(storeResponse.getBody()).doesNotContain("1번 테스트 매장");
+            assertThat(menuResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(menuResponse.getBody()).contains("2번 메뉴");
+            assertThat(menuResponse.getBody()).doesNotContain("1번 메뉴");
         }
 
         @Test

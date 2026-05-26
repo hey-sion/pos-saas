@@ -9,15 +9,11 @@ import jakarta.validation.constraints.Positive;
 import java.util.List;
 
 public record OrderCreateRequest(
-        @NotNull(message = "storeId는 필수입니다.")
-        @Positive(message = "storeId는 1 이상이어야 합니다.")
-        Long storeId,
-
         @NotEmpty(message = "주문 항목이 비어 있습니다.")
         List<@Valid Line> items
 ) {
 
-    public OrderCreateCommand toCommand() {
+    public OrderCreateCommand toCommand(Long storeId) {
         return new OrderCreateCommand(
                 storeId,
                 items.stream()

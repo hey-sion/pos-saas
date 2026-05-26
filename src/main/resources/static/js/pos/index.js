@@ -1,5 +1,3 @@
-const STORE_ID = 1;
-
 const state = {
     menus: [],
     cart: [],
@@ -35,7 +33,7 @@ async function loadStore() {
     const storeName = document.getElementById("storeName");
 
     try {
-        const response = await fetch(`/api/stores/${STORE_ID}`);
+        const response = await fetch("/api/stores/me");
 
         if (!response.ok) {
             storeName.textContent = "매장명: -";
@@ -54,7 +52,7 @@ async function loadMenus() {
     const emptyMessage = document.getElementById("emptyMessage");
 
     try {
-        const response = await fetch(`/api/menus?storeId=${STORE_ID}`);
+        const response = await fetch("/api/menus");
 
         if (!response.ok) {
             throw new Error("Failed to load menus");
@@ -249,7 +247,6 @@ async function submitOrder() {
 
 async function createOrder() {
     const payload = {
-        storeId: STORE_ID,
         items: state.cart.map((item) => ({
             menuId: item.menuId,
             quantity: item.quantity
@@ -458,7 +455,7 @@ function playCompletionSound() {
 
 async function refreshWaitingOrders() {
     try {
-        const response = await fetch(`/api/v1/orders/waiting?storeId=${STORE_ID}`);
+        const response = await fetch("/api/v1/orders/waiting");
 
         if (!response.ok) {
             throw new Error("Failed to load waiting orders");

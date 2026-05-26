@@ -79,7 +79,6 @@ class OrderV1ApiE2ETest {
         @DisplayName("유효한 요청이면, 201 Created와 RECEIVED 상태의 주문 정보를 반환한다.")
         void returnsCreated_whenValidRequest() {
             OrderCreateRequest request = new OrderCreateRequest(
-                    storeId,
                     List.of(
                             new OrderCreateRequest.Line(americanoId, 1),
                             new OrderCreateRequest.Line(latteId, 2)
@@ -125,7 +124,7 @@ class OrderV1ApiE2ETest {
         @Test
         @DisplayName("주문 항목이 비어 있으면, 400 Bad Request를 반환한다.")
         void returnsBadRequest_whenItemsAreEmpty() {
-            OrderCreateRequest request = new OrderCreateRequest(storeId, List.of());
+            OrderCreateRequest request = new OrderCreateRequest(List.of());
 
             ResponseEntity<ApiResponse<Void>> response =
                     testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
@@ -345,7 +344,7 @@ class OrderV1ApiE2ETest {
             updateOrderStatus(secondOrderId, Order.Status.CANCELLED);
 
             ResponseEntity<DailyOrderSummaryResponse> response =
-                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?storeId=" + storeId + "&date=" + today,
+                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?date=" + today,
                             HttpMethod.GET, HttpEntity.EMPTY, DailyOrderSummaryResponse.class);
 
             DailyOrderSummaryResponse body = response.getBody();
@@ -372,7 +371,7 @@ class OrderV1ApiE2ETest {
             updateOrderStatus(cancelledOrderId, Order.Status.CANCELLED);
 
             ResponseEntity<DailyOrderSummaryResponse> response =
-                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?storeId=" + storeId + "&date=" + today,
+                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?date=" + today,
                             HttpMethod.GET, HttpEntity.EMPTY, DailyOrderSummaryResponse.class);
 
             DailyOrderSummaryResponse body = response.getBody();
@@ -390,7 +389,7 @@ class OrderV1ApiE2ETest {
             LocalDate dateWithoutOrders = LocalDate.now().minusDays(1);
 
             ResponseEntity<DailyOrderSummaryResponse> response =
-                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?storeId=" + storeId + "&date=" + dateWithoutOrders,
+                    testRestTemplate.exchange(ENDPOINT + "/daily-summary?date=" + dateWithoutOrders,
                             HttpMethod.GET, HttpEntity.EMPTY, DailyOrderSummaryResponse.class);
 
             DailyOrderSummaryResponse body = response.getBody();
@@ -406,7 +405,6 @@ class OrderV1ApiE2ETest {
 
     private Long createOrder() {
         OrderCreateRequest request = new OrderCreateRequest(
-                storeId,
                 List.of(new OrderCreateRequest.Line(americanoId, 1))
         );
 
@@ -418,7 +416,7 @@ class OrderV1ApiE2ETest {
 
     private List<WaitingOrderResponse> getWaitingOrders() {
         ResponseEntity<List<WaitingOrderResponse>> response =
-                testRestTemplate.exchange(ENDPOINT + "/waiting?storeId=" + storeId, HttpMethod.GET,
+                testRestTemplate.exchange(ENDPOINT + "/waiting", HttpMethod.GET,
                         HttpEntity.EMPTY, new ParameterizedTypeReference<>() {});
 
         return response.getBody();

@@ -2,6 +2,7 @@ package com.sion.pos.interfaces.api.order;
 
 import com.sion.pos.application.order.OrderFacade;
 import com.sion.pos.application.order.OrderService;
+import com.sion.pos.support.security.LoginStore;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
@@ -28,8 +29,11 @@ public class OrderV1ApiController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public OrderCreateResponse create(@Valid @RequestBody OrderCreateRequest request) {
-        return OrderCreateResponse.from(orderFacade.createOrder(request.toCommand()));
+    public OrderCreateResponse create(
+            @LoginStore Long storeId,
+            @Valid @RequestBody OrderCreateRequest request
+    ) {
+        return OrderCreateResponse.from(orderFacade.createOrder(request.toCommand(storeId)));
     }
 
     @PutMapping("/{orderId}/items")
@@ -50,7 +54,7 @@ public class OrderV1ApiController {
     }
 
     @GetMapping("/waiting")
-    public List<WaitingOrderResponse> getWaitingOrders(@RequestParam Long storeId) {
+    public List<WaitingOrderResponse> getWaitingOrders(@LoginStore Long storeId) {
         return orderService.getWaitingOrders(storeId).stream()
                            .map(WaitingOrderResponse::from)
                            .toList();
@@ -58,7 +62,7 @@ public class OrderV1ApiController {
 
     @GetMapping("/daily-summary")
     public DailyOrderSummaryResponse getDailySummary(
-            @RequestParam Long storeId,
+            @LoginStore Long storeId,
             @RequestParam LocalDate date
     ) {
         return DailyOrderSummaryResponse.from(orderService.getDailySummary(storeId, date));

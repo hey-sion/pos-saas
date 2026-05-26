@@ -1,5 +1,3 @@
-const STORE_ID = 1;
-
 const formatPrice = (price) => new Intl.NumberFormat("ko-KR").format(price) + "원";
 
 function todayIsoDate() {
@@ -22,7 +20,7 @@ async function loadStore() {
     const storeName = document.getElementById("storeName");
 
     try {
-        const response = await fetch(`/api/stores/${STORE_ID}`);
+        const response = await fetch("/api/stores/me");
 
         if (!response.ok) {
             storeName.textContent = "매장명: -";
@@ -45,7 +43,7 @@ async function loadDailySummary() {
     }
 
     try {
-        const response = await fetch(`/api/v1/orders/daily-summary?storeId=${STORE_ID}&date=${date}`);
+        const response = await fetch(`/api/v1/orders/daily-summary?date=${date}`);
 
         if (!response.ok) {
             throw new Error("Failed to load daily summary");
