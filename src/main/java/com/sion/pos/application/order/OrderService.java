@@ -26,20 +26,27 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
 
+    @Transactional(readOnly = true)
+    public Order getOrder(Long storeId, Long orderId) {
+        return orderRepository.findByIdAndStoreId(orderId, storeId)
+                              .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    }
+
     @Transactional
-    public void updateStatus(Long orderId, Order.Status status) {
-        Order order = orderRepository.findById(orderId)
-                                     .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    public void updateStatus(Long storeId, Long orderId, Order.Status status) {
+        Order order = getOrder(storeId, orderId);
 
         switch (status) {
             case DELIVERED -> {
                 validatePaymentCompleted(order.getId());
                 order.deliver();
             }
+
             case CANCELLED -> {
                 order.cancel();
                 invalidatePendingPgPayments(order.getId());
             }
+
             case RECEIVED -> throw new PosApplicationException(ErrorType.BAD_REQUEST, "변경할 수 없는 주문 상태입니다.");
         }
     }

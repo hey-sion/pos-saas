@@ -176,6 +176,20 @@ class OrderV1ApiE2ETest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
+
+        @Test
+        @DisplayName("다른 매장 주문이면 404 Not Found를 반환한다.")
+        void returnsNotFound_whenOrderBelongsToOtherStore() {
+            Long otherStoreOrderId = createOtherStoreOrder();
+            OrderUpdateItemsRequest request = new OrderUpdateItemsRequest(
+                    List.of(new OrderUpdateItemsRequest.Line(latteId, 1)));
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT + "/" + otherStoreOrderId + "/items", HttpMethod.PUT,
+                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
     }
 
     @Nested
@@ -326,6 +340,19 @@ class OrderV1ApiE2ETest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
+
+        @Test
+        @DisplayName("다른 매장 주문이면, 404 Not Found를 반환한다.")
+        void returnsNotFound_whenOrderBelongsToOtherStore() {
+            Long otherStoreOrderId = createOtherStoreOrder();
+            OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.CANCELLED);
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT + "/" + otherStoreOrderId + "/status", HttpMethod.PATCH,
+                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
     }
 
     @Nested
@@ -412,6 +439,15 @@ class OrderV1ApiE2ETest {
                 testRestTemplate.exchange(ENDPOINT, HttpMethod.POST, new HttpEntity<>(request), OrderCreateResponse.class);
 
         return response.getBody().id();
+    }
+
+    private Long createOtherStoreOrder() {
+        Store otherStore = storeRepository.save(Store.create("2번 테스트 매장", "010-9999-9999"));
+        Long otherMenuId = menuRepository.save(Menu.create(otherStore.getId(), "다른 매장 메뉴", 9_000, 1)).getId();
+        Order otherOrder = orderRepository.save(Order.create(otherStore.getId(), LocalDate.now(), 1, 9_000));
+        orderItemRepository.save(OrderItem.create(otherOrder.getId(), otherMenuId, "다른 매장 메뉴", 9_000, 1));
+
+        return otherOrder.getId();
     }
 
     private List<WaitingOrderResponse> getWaitingOrders() {

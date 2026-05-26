@@ -26,6 +26,7 @@ public class OrderFacade {
     private final MenuRepository menuRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OrderService orderService;
     private final OrderNumberIssuer orderNumberIssuer;
     private final PaymentRepository paymentRepository;
 
@@ -54,14 +55,18 @@ public class OrderFacade {
     }
 
     @Transactional
-    public Order updateOrderItems(Long orderId, OrderUpdateItemsCommand command) {
+    public Order updateOrderItems(Long storeId, Long orderId, OrderUpdateItemsCommand command) {
+        if (storeId == null || storeId <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "storeId는 1 이상이어야 합니다.");
+        }
+
         if (orderId == null || orderId <= 0) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "orderId는 1 이상이어야 합니다.");
         }
+
         validateLines(command.items());
 
-        Order order = orderRepository.findById(orderId)
-                                     .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+        Order order = orderService.getOrder(storeId, orderId);
         if (order.getStatus() != Order.Status.RECEIVED) {
             throw new PosApplicationException(ErrorType.CONFLICT,
                     "주문 접수 상태에서만 수정 가능합니다. 현재 상태: " + order.getStatus());
@@ -75,7 +80,7 @@ public class OrderFacade {
         }
 
         Map<Long, Menu> menuById = menuRepository
-                .findByIdInAndStoreIdAndActiveTrueAndDeletedAtIsNull(menuIds(command.items()), order.getStoreId())
+                .findByIdInAndStoreIdAndActiveTrueAndDeletedAtIsNull(menuIds(command.items()), storeId)
                 .stream()
                 .collect(Collectors.toMap(Menu::getId, Function.identity()));
         if (menuById.size() != command.items().size()) {

@@ -213,7 +213,7 @@ class OrderFacadeIntegrationTest {
                             new OrderItemLine(latteId, 1)
                     ));
 
-            Order updated = orderFacade.updateOrderItems(order.getId(), command);
+            Order updated = orderFacade.updateOrderItems(storeId, order.getId(), command);
 
             Order persisted = orderRepository.findById(updated.getId()).orElseThrow();
             List<OrderItem> activeItems = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(order.getId()));
@@ -237,7 +237,7 @@ class OrderFacadeIntegrationTest {
             OrderUpdateItemsCommand command = new OrderUpdateItemsCommand(
                     List.of(new OrderItemLine(latteId, 1)));
 
-            expects(ErrorType.CONFLICT, () -> orderFacade.updateOrderItems(order.getId(), command));
+            expects(ErrorType.CONFLICT, () -> orderFacade.updateOrderItems(storeId, order.getId(), command));
         }
 
         @Test
@@ -252,7 +252,7 @@ class OrderFacadeIntegrationTest {
             OrderUpdateItemsCommand command = new OrderUpdateItemsCommand(
                     List.of(new OrderItemLine(latteId, 1)));
 
-            orderFacade.updateOrderItems(order.getId(), command);
+            orderFacade.updateOrderItems(storeId, order.getId(), command);
 
             Payment persisted = paymentRepository.findById(pendingPg.getId()).orElseThrow();
             assertThat(persisted.getStatus()).isEqualTo(Payment.Status.FAILED);
@@ -268,7 +268,7 @@ class OrderFacadeIntegrationTest {
             OrderUpdateItemsCommand command = new OrderUpdateItemsCommand(
                     List.of(new OrderItemLine(latteId, 1)));
 
-            expects(ErrorType.CONFLICT, () -> orderFacade.updateOrderItems(order.getId(), command));
+            expects(ErrorType.CONFLICT, () -> orderFacade.updateOrderItems(storeId, order.getId(), command));
         }
     }
 

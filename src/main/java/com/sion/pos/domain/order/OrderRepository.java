@@ -2,6 +2,7 @@ package com.sion.pos.domain.order;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -13,4 +14,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     );
 
     List<Order> findByStoreIdAndOrderDateOrderByOrderNumberAsc(Long storeId, LocalDate orderDate);
+
+    Optional<Order> findByIdAndStoreId(Long id, Long storeId);
 }

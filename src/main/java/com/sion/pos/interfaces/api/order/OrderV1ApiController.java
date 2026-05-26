@@ -38,19 +38,21 @@ public class OrderV1ApiController {
 
     @PutMapping("/{orderId}/items")
     public OrderCreateResponse updateItems(
+            @LoginStore Long storeId,
             @PathVariable Long orderId,
             @Valid @RequestBody OrderUpdateItemsRequest request
     ) {
-        return OrderCreateResponse.from(orderFacade.updateOrderItems(orderId, request.toCommand()));
+        return OrderCreateResponse.from(orderFacade.updateOrderItems(storeId, orderId, request.toCommand()));
     }
 
     @PatchMapping("/{orderId}/status")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateStatus(
+            @LoginStore Long storeId,
             @PathVariable Long orderId,
             @Valid @RequestBody OrderStatusUpdateRequest request
     ) {
-        orderService.updateStatus(orderId, request.status());
+        orderService.updateStatus(storeId, orderId, request.status());
     }
 
     @GetMapping("/waiting")
