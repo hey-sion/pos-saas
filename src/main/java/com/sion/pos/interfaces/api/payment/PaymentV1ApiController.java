@@ -30,7 +30,7 @@ public class PaymentV1ApiController {
         return PaymentVerifyResponse.from(paymentFacade.verify(paymentId));
     }
 
-    @PostMapping("/webhook/portone")
+    @PostMapping({"/webhook/portone", "/webhook/portone/"})
     @ResponseStatus(HttpStatus.OK)
     public void portOneWebhook(@RequestBody PortOneWebhookRequest request) {
         paymentFacade.handlePortOneWebhook(request.type(), request.pgPaymentId());

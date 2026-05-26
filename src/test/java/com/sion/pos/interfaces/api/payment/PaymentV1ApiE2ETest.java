@@ -294,6 +294,19 @@ class PaymentV1ApiE2ETest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
+        @Test
+        @DisplayName("URL 끝에 슬래시가 붙어도 200 OK로 응답한다. (PortOne이 trailing slash를 붙임)")
+        void returnsOk_whenTrailingSlash() {
+            PaymentCreateResponse created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+
+            ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT + "/", HttpMethod.POST,
+                    new HttpEntity<>(webhookBody("Transaction.Paid", created.pg().paymentId())), Void.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
         private PaymentCreateResponse createPgPayment() {
             Order order = createOrder(americanoId, 1);
             return testRestTemplate.postForObject(ENDPOINT,
