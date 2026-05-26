@@ -12,6 +12,7 @@ import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import com.sion.pos.support.portone.PortOneProperties;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentFacade {
 
     private static final Set<String> HANDLED_TYPES = Set.of("Transaction.Paid", "Transaction.Failed");
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final OrderService orderService;
     private final OrderItemRepository orderItemRepository;
@@ -66,7 +68,7 @@ public class PaymentFacade {
                 order.getId(),
                 command.method(),
                 order.getTotalAmount(),
-                LocalDateTime.now()));
+                LocalDateTime.now(BUSINESS_ZONE)));
         return PaymentCreateInfo.offline(payment);
     }
 
@@ -126,7 +128,7 @@ public class PaymentFacade {
                     return;
                 }
 
-                paymentRepository.completeIfPending(payment.getId(), LocalDateTime.now(), result.transactionKey());
+                paymentRepository.completeIfPending(payment.getId(), LocalDateTime.now(BUSINESS_ZONE), result.transactionKey());
             }
             case FAILED -> paymentRepository.failIfPending(payment.getId(), result.failReason());
             case PENDING -> {

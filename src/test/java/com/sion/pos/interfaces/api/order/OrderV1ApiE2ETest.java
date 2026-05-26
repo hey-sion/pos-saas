@@ -356,6 +356,25 @@ class OrderV1ApiE2ETest {
     }
 
     @Nested
+    @DisplayName("고객 대기화면 조회 시, ")
+    class WaitingOrders {
+
+        @Test
+        @DisplayName("오늘 날짜의 접수건만 조회한다.")
+        void returnsOnlyTodayReceivedOrders() {
+            LocalDate yesterday = LocalDate.now().minusDays(1);
+            Order yesterdayReceivedOrder = orderRepository.save(Order.create(storeId, yesterday, 1, AMERICANO_PRICE));
+            orderItemRepository.save(OrderItem.create(yesterdayReceivedOrder.getId(), americanoId, "아메리카노", AMERICANO_PRICE, 1));
+            Long todayOrderId = createOrder();
+
+            List<WaitingOrderResponse> waitingOrders = getWaitingOrders();
+
+            assertThat(waitingOrders).extracting(WaitingOrderResponse::id)
+                                     .containsExactly(todayOrderId);
+        }
+    }
+
+    @Nested
     @DisplayName("일별 주문 요약 조회 시, ")
     class DailySummary {
 

@@ -11,6 +11,7 @@ import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -22,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class OrderFacade {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final MenuRepository menuRepository;
     private final OrderRepository orderRepository;
@@ -44,7 +47,7 @@ public class OrderFacade {
 
         int totalAmount = calculateTotalAmount(command.items(), menuById);
 
-        LocalDate orderDate = LocalDate.now();
+        LocalDate orderDate = LocalDate.now(BUSINESS_ZONE);
         int orderNumber = orderNumberIssuer.issue(command.storeId(), orderDate);
 
         Order order = orderRepository.save(Order.create(command.storeId(), orderDate, orderNumber, totalAmount));

@@ -9,6 +9,7 @@ import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class OrderService {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -55,7 +58,7 @@ public class OrderService {
     public List<WaitingOrderInfo> getWaitingOrders(Long storeId) {
         List<Order> orders = orderRepository.findByStoreIdAndOrderDateAndStatusOrderByOrderNumberAsc(
                 storeId,
-                LocalDate.now(),
+                LocalDate.now(BUSINESS_ZONE),
                 Order.Status.RECEIVED
         );
 
