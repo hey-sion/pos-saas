@@ -1,9 +1,9 @@
 package com.sion.pos.application.payment;
 
+import com.sion.pos.application.order.OrderService;
 import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
-import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.domain.payment.PaymentGateway;
 import com.sion.pos.domain.payment.PaymentGatewayResult;
@@ -28,16 +28,15 @@ public class PaymentFacade {
 
     private static final Set<String> HANDLED_TYPES = Set.of("Transaction.Paid", "Transaction.Failed");
 
-    private final OrderRepository orderRepository;
+    private final OrderService orderService;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
     private final PortOneProperties portOneProperties;
 
     @Transactional
-    public PaymentCreateInfo createPayment(PaymentCreateCommand command) {
-        Order order = orderRepository.findById(command.orderId())
-                                     .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    public PaymentCreateInfo createPayment(Long storeId, PaymentCreateCommand command) {
+        Order order = orderService.getOrder(storeId, command.orderId());
         if (order.getStatus() != Order.Status.RECEIVED) {
             throw new PosApplicationException(ErrorType.CONFLICT,
                     "결제할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
@@ -72,9 +71,8 @@ public class PaymentFacade {
     }
 
     @Transactional
-    public PaymentVerifyInfo verify(Long paymentId) {
-        Payment payment = paymentRepository.findById(paymentId)
-                                           .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다."));
+    public PaymentVerifyInfo verify(Long storeId, Long paymentId) {
+        Payment payment = getPayment(storeId, paymentId);
 
         if (!payment.isPgChannel()) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "PG 결제만 검증할 수 있습니다.");
@@ -153,5 +151,10 @@ public class PaymentFacade {
         }
 
         return first + " 외 " + (items.size() - 1) + "건";
+    }
+
+    private Payment getPayment(Long storeId, Long paymentId) {
+        return paymentRepository.findByIdAndOrderStoreId(paymentId, storeId)
+                                .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다."));
     }
 }

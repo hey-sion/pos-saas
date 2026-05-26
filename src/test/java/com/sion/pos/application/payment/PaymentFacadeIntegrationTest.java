@@ -72,7 +72,7 @@ class PaymentFacadeIntegrationTest {
         void createsCompletedOfflinePaymentForCash() {
             Order order = createOrderWith(americanoId, 1);
 
-            PaymentCreateInfo info = paymentFacade.createPayment(
+            PaymentCreateInfo info = paymentFacade.createPayment(storeId,
                     new PaymentCreateCommand(order.getId(), Payment.Method.CASH, null));
 
             Payment persisted = paymentRepository.findById(info.paymentId()).orElseThrow();
@@ -91,7 +91,7 @@ class PaymentFacadeIntegrationTest {
         void createsCompletedOfflinePaymentForCard() {
             Order order = createOrderWith(americanoId, 1);
 
-            PaymentCreateInfo info = paymentFacade.createPayment(
+            PaymentCreateInfo info = paymentFacade.createPayment(storeId,
                     new PaymentCreateCommand(order.getId(), Payment.Method.CARD, null));
 
             assertThat(info.status()).isEqualTo(Payment.Status.COMPLETED);
@@ -103,10 +103,10 @@ class PaymentFacadeIntegrationTest {
         @DisplayName("이미 결제 완료된 주문이면 CONFLICT 예외를 발생시킨다")
         void throwsConflictWhenAlreadyCompleted() {
             Order order = createOrderWith(americanoId, 1);
-            paymentFacade.createPayment(
+            paymentFacade.createPayment(storeId,
                     new PaymentCreateCommand(order.getId(), Payment.Method.CASH, null));
 
-            expects(ErrorType.CONFLICT, () -> paymentFacade.createPayment(
+            expects(ErrorType.CONFLICT, () -> paymentFacade.createPayment(storeId,
                     new PaymentCreateCommand(order.getId(), Payment.Method.CARD, null)));
         }
 
@@ -117,15 +117,24 @@ class PaymentFacadeIntegrationTest {
             order.cancel();
             orderRepository.save(order);
 
-            expects(ErrorType.CONFLICT, () -> paymentFacade.createPayment(
+            expects(ErrorType.CONFLICT, () -> paymentFacade.createPayment(storeId,
                     new PaymentCreateCommand(order.getId(), Payment.Method.CASH, null)));
         }
 
         @Test
         @DisplayName("존재하지 않는 주문이면 NOT_FOUND 예외를 발생시킨다")
         void throwsNotFoundWhenOrderNotExists() {
-            expects(ErrorType.NOT_FOUND, () -> paymentFacade.createPayment(
+            expects(ErrorType.NOT_FOUND, () -> paymentFacade.createPayment(storeId,
                     new PaymentCreateCommand(Long.MAX_VALUE, Payment.Method.CASH, null)));
+        }
+
+        @Test
+        @DisplayName("다른 매장 주문이면 NOT_FOUND 예외를 발생시킨다")
+        void throwsNotFoundWhenOrderBelongsToOtherStore() {
+            Order otherStoreOrder = createOtherStoreOrder();
+
+            expects(ErrorType.NOT_FOUND, () -> paymentFacade.createPayment(storeId,
+                    new PaymentCreateCommand(otherStoreOrder.getId(), Payment.Method.CASH, null)));
         }
 
         @Test
@@ -133,7 +142,7 @@ class PaymentFacadeIntegrationTest {
         void throwsWhenMethodIsNull() {
             Order order = createOrderWith(americanoId, 1);
 
-            expects(ErrorType.BAD_REQUEST, () -> paymentFacade.createPayment(
+            expects(ErrorType.BAD_REQUEST, () -> paymentFacade.createPayment(storeId,
                     new PaymentCreateCommand(order.getId(), null, null)));
         }
     }
@@ -149,7 +158,7 @@ class PaymentFacadeIntegrationTest {
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
 
-            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+            PaymentVerifyInfo info = paymentFacade.verify(storeId, created.paymentId());
 
             Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
             assertAll(
@@ -168,7 +177,7 @@ class PaymentFacadeIntegrationTest {
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.FAILED, null, null, "사용자 취소"));
 
-            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+            PaymentVerifyInfo info = paymentFacade.verify(storeId, created.paymentId());
 
             Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
             assertAll(
@@ -185,7 +194,7 @@ class PaymentFacadeIntegrationTest {
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PENDING, null, null, null));
 
-            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+            PaymentVerifyInfo info = paymentFacade.verify(storeId, created.paymentId());
 
             assertThat(info.status()).isEqualTo(Payment.Status.PENDING);
         }
@@ -196,10 +205,10 @@ class PaymentFacadeIntegrationTest {
             PaymentCreateInfo created = createPgPayment();
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
-            paymentFacade.verify(created.paymentId());
+            paymentFacade.verify(storeId, created.paymentId());
             fakePaymentGateway.clear();
 
-            PaymentVerifyInfo info = paymentFacade.verify(created.paymentId());
+            PaymentVerifyInfo info = paymentFacade.verify(storeId, created.paymentId());
 
             Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
             assertAll(
@@ -216,7 +225,7 @@ class PaymentFacadeIntegrationTest {
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE + 1_000, "tx-abc", null));
 
-            assertThatCode(() -> paymentFacade.verify(created.paymentId())).doesNotThrowAnyException();
+            assertThatCode(() -> paymentFacade.verify(storeId, created.paymentId())).doesNotThrowAnyException();
 
             Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
             assertAll(
@@ -224,6 +233,14 @@ class PaymentFacadeIntegrationTest {
                     () -> assertThat(persisted.getPaidAt()).isNull(),
                     () -> assertThat(persisted.getPgTransactionKey()).isNull()
             );
+        }
+
+        @Test
+        @DisplayName("다른 매장 결제이면 NOT_FOUND 예외를 발생시킨다")
+        void throwsNotFoundWhenPaymentBelongsToOtherStore() {
+            Payment payment = createOtherStorePgPayment();
+
+            expects(ErrorType.NOT_FOUND, () -> paymentFacade.verify(storeId, payment.getId()));
         }
     }
 
@@ -283,7 +300,7 @@ class PaymentFacadeIntegrationTest {
             PaymentCreateInfo created = createPgPayment();
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
-            paymentFacade.verify(created.paymentId());
+            paymentFacade.verify(storeId, created.paymentId());
             fakePaymentGateway.clear();
 
             assertThatCode(() -> paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId()))
@@ -339,10 +356,27 @@ class PaymentFacadeIntegrationTest {
 
     private PaymentCreateInfo createPgPayment() {
         Order order = createOrderWith(americanoId, 1);
-        return paymentFacade.createPayment(new PaymentCreateCommand(
+        return paymentFacade.createPayment(storeId, new PaymentCreateCommand(
                 order.getId(),
                 Payment.Method.EASY_PAY,
                 Payment.Provider.KAKAO_PAY));
+    }
+
+    private Order createOtherStoreOrder() {
+        Store otherStore = storeRepository.save(Store.create("2번 테스트 매장", "010-9999-9999"));
+        Long otherMenuId = menuRepository.save(Menu.create(otherStore.getId(), "다른 매장 메뉴", 9_000, 1)).getId();
+        return orderFacade.createOrder(new OrderCreateCommand(
+                otherStore.getId(),
+                List.of(new OrderItemLine(otherMenuId, 1))));
+    }
+
+    private Payment createOtherStorePgPayment() {
+        Order order = createOtherStoreOrder();
+        return paymentRepository.save(Payment.createPg(
+                order.getId(),
+                Payment.Provider.KAKAO_PAY,
+                order.getTotalAmount(),
+                "other-store-payment"));
     }
 
     private static void expects(ErrorType expected, ThrowingCallable callable) {

@@ -3,6 +3,7 @@ package com.sion.pos.interfaces.api.payment;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sion.pos.application.payment.PaymentFacade;
+import com.sion.pos.support.security.LoginStore;
 import com.sion.pos.support.portone.PortOneWebhookVerifier;
 import com.sion.pos.support.portone.WebhookVerificationException;
 import jakarta.validation.Valid;
@@ -30,14 +31,14 @@ public class PaymentV1ApiController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public PaymentCreateResponse create(@Valid @RequestBody PaymentCreateRequest request) {
-        return PaymentCreateResponse.from(paymentFacade.createPayment(request.toCommand()));
+    public PaymentCreateResponse create(@LoginStore Long storeId, @Valid @RequestBody PaymentCreateRequest request) {
+        return PaymentCreateResponse.from(paymentFacade.createPayment(storeId, request.toCommand()));
     }
 
     @PostMapping("/{paymentId}/verify")
     @ResponseStatus(HttpStatus.OK)
-    public PaymentVerifyResponse verify(@PathVariable Long paymentId) {
-        return PaymentVerifyResponse.from(paymentFacade.verify(paymentId));
+    public PaymentVerifyResponse verify(@LoginStore Long storeId, @PathVariable Long paymentId) {
+        return PaymentVerifyResponse.from(paymentFacade.verify(storeId, paymentId));
     }
 
     @PostMapping({"/webhook/portone", "/webhook/portone/"})

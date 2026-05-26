@@ -162,6 +162,19 @@ class PaymentV1ApiE2ETest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
+
+        @Test
+        @DisplayName("다른 매장 주문이면 404 Not Found를 반환한다.")
+        void returnsNotFound_whenOrderBelongsToOtherStore() {
+            Order otherStoreOrder = createOtherStoreOrder();
+            PaymentCreateRequest request = new PaymentCreateRequest(otherStoreOrder.getId(), Payment.Method.CASH, null);
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT, HttpMethod.POST,
+                            new HttpEntity<>(request), new ParameterizedTypeReference<>() {});
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
     }
 
     @Nested
@@ -249,6 +262,18 @@ class PaymentV1ApiE2ETest {
         void returnsNotFound_whenPaymentNotExists() {
             ResponseEntity<ApiResponse<Void>> response =
                     testRestTemplate.exchange(verifyEndpoint(Long.MAX_VALUE), HttpMethod.POST,
+                            HttpEntity.EMPTY, new ParameterizedTypeReference<>() {});
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("다른 매장 결제이면 404 Not Found를 반환한다.")
+        void returnsNotFound_whenPaymentBelongsToOtherStore() {
+            Payment payment = createOtherStorePgPayment();
+
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(verifyEndpoint(payment.getId()), HttpMethod.POST,
                             HttpEntity.EMPTY, new ParameterizedTypeReference<>() {});
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -396,5 +421,22 @@ class PaymentV1ApiE2ETest {
         return orderFacade.createOrder(new OrderCreateCommand(
                 storeId,
                 List.of(new OrderItemLine(menuId, quantity))));
+    }
+
+    private Order createOtherStoreOrder() {
+        Store otherStore = storeRepository.save(Store.create("2번 테스트 매장", "010-9999-9999"));
+        Long otherMenuId = menuRepository.save(Menu.create(otherStore.getId(), "다른 매장 메뉴", 9_000, 1)).getId();
+        return orderFacade.createOrder(new OrderCreateCommand(
+                otherStore.getId(),
+                List.of(new OrderItemLine(otherMenuId, 1))));
+    }
+
+    private Payment createOtherStorePgPayment() {
+        Order order = createOtherStoreOrder();
+        return paymentRepository.save(Payment.createPg(
+                order.getId(),
+                Payment.Provider.KAKAO_PAY,
+                order.getTotalAmount(),
+                "other-store-payment"));
     }
 }

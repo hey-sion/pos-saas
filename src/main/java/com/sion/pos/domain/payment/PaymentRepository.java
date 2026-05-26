@@ -14,6 +14,15 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Optional<Payment> findByPgPaymentId(String pgPaymentId);
 
+    @Query(value = """
+            SELECT p.*
+              FROM payment p
+              JOIN orders o ON o.id = p.order_id
+             WHERE p.id = :id
+               AND o.store_id = :storeId
+            """, nativeQuery = true)
+    Optional<Payment> findByIdAndOrderStoreId(@Param("id") Long id, @Param("storeId") Long storeId);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE payment
