@@ -23,11 +23,11 @@ class OrderTest {
     class Create {
 
         @Test
-        @DisplayName("RECEIVED 상태로 주문을 생성한다")
-        void createsOrderInReceivedStatus() {
+        @DisplayName("결제 대기(PAYMENT_PENDING) 상태로 주문을 생성한다")
+        void createsOrderInPaymentPendingStatus() {
             Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
 
-            assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED);
+            assertThat(order.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING);
             assertThat(order.getStoreId()).isEqualTo(STORE_ID);
             assertThat(order.getOrderDate()).isEqualTo(ORDER_DATE);
             assertThat(order.getOrderNumber()).isEqualTo(ORDER_NUMBER);
@@ -69,13 +69,52 @@ class OrderTest {
     }
 
     @Nested
+    @DisplayName("주문 접수 처리 시, ")
+    class MarkReceived {
+
+        @Test
+        @DisplayName("PAYMENT_PENDING 상태에서 호출하면 RECEIVED로 상태가 변경된다")
+        void transitionsPaymentPendingToReceived() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+
+            order.markReceived();
+
+            assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED);
+        }
+
+        @Test
+        @DisplayName("이미 RECEIVED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenAlreadyReceived() {
+            Order order = receivedOrder();
+
+            expects(ErrorType.CONFLICT, order::markReceived);
+        }
+
+        @Test
+        @DisplayName("이미 DELIVERED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenAlreadyDelivered() {
+            Order order = deliveredOrder();
+
+            expects(ErrorType.CONFLICT, order::markReceived);
+        }
+
+        @Test
+        @DisplayName("이미 CANCELLED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenAlreadyCancelled() {
+            Order order = cancelledOrder();
+
+            expects(ErrorType.CONFLICT, order::markReceived);
+        }
+    }
+
+    @Nested
     @DisplayName("주문 제공 완료 처리 시, ")
     class Deliver {
 
         @Test
         @DisplayName("RECEIVED 상태에서 호출하면 DELIVERED로 상태가 변경된다")
         void transitionsReceivedToDelivered() {
-            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+            Order order = receivedOrder();
 
             order.deliver();
 
@@ -83,10 +122,17 @@ class OrderTest {
         }
 
         @Test
+        @DisplayName("결제 대기(PAYMENT_PENDING) 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenPaymentPending() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+
+            expects(ErrorType.CONFLICT, order::deliver);
+        }
+
+        @Test
         @DisplayName("이미 DELIVERED 상태면 CONFLICT 예외를 던진다")
         void throwsWhenAlreadyDelivered() {
-            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
-            order.deliver();
+            Order order = deliveredOrder();
 
             expects(ErrorType.CONFLICT, order::deliver);
         }
@@ -94,8 +140,7 @@ class OrderTest {
         @Test
         @DisplayName("이미 CANCELLED 상태면 CONFLICT 예외를 던진다")
         void throwsWhenAlreadyCancelled() {
-            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
-            order.cancel();
+            Order order = cancelledOrder();
 
             expects(ErrorType.CONFLICT, order::deliver);
         }
@@ -106,9 +151,19 @@ class OrderTest {
     class Cancel {
 
         @Test
+        @DisplayName("PAYMENT_PENDING 상태에서 호출하면 CANCELLED로 상태가 변경된다")
+        void transitionsPaymentPendingToCancelled() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+
+            order.cancel();
+
+            assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED);
+        }
+
+        @Test
         @DisplayName("RECEIVED 상태에서 호출하면 CANCELLED로 상태가 변경된다")
         void transitionsReceivedToCancelled() {
-            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+            Order order = receivedOrder();
 
             order.cancel();
 
@@ -118,8 +173,7 @@ class OrderTest {
         @Test
         @DisplayName("이미 DELIVERED 상태면 CONFLICT 예외를 던진다")
         void throwsWhenAlreadyDelivered() {
-            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
-            order.deliver();
+            Order order = deliveredOrder();
 
             expects(ErrorType.CONFLICT, order::cancel);
         }
@@ -127,11 +181,61 @@ class OrderTest {
         @Test
         @DisplayName("이미 CANCELLED 상태면 CONFLICT 예외를 던진다")
         void throwsWhenAlreadyCancelled() {
-            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
-            order.cancel();
+            Order order = cancelledOrder();
 
             expects(ErrorType.CONFLICT, order::cancel);
         }
+    }
+
+    @Nested
+    @DisplayName("주문 금액 변경 시, ")
+    class ChangeTotalAmount {
+
+        @Test
+        @DisplayName("PAYMENT_PENDING 상태에서 호출하면 총액이 변경된다")
+        void changesTotalAmountWhenPaymentPending() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+
+            order.changeTotalAmount(9_000);
+
+            assertThat(order.getTotalAmount()).isEqualTo(9_000);
+        }
+
+        @Test
+        @DisplayName("이미 RECEIVED(결제 완료) 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenAlreadyReceived() {
+            Order order = receivedOrder();
+
+            expects(ErrorType.CONFLICT, () -> order.changeTotalAmount(9_000));
+        }
+
+        @Test
+        @DisplayName("총액이 null 또는 0 이하이면 BAD_REQUEST 예외를 발생시킨다")
+        void throwsWhenTotalAmountIsNotPositive() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+
+            expects(ErrorType.BAD_REQUEST, () -> order.changeTotalAmount(null));
+            expects(ErrorType.BAD_REQUEST, () -> order.changeTotalAmount(0));
+            expects(ErrorType.BAD_REQUEST, () -> order.changeTotalAmount(-1));
+        }
+    }
+
+    private static Order receivedOrder() {
+        Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+        order.markReceived();
+        return order;
+    }
+
+    private static Order deliveredOrder() {
+        Order order = receivedOrder();
+        order.deliver();
+        return order;
+    }
+
+    private static Order cancelledOrder() {
+        Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+        order.cancel();
+        return order;
     }
 
     private static void expects(ErrorType expected, ThrowingCallable callable) {

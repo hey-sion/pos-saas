@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.sion.pos.application.store.StoreAccountService;
-import com.sion.pos.interfaces.api.ApiResponse;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
@@ -15,9 +14,11 @@ import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
+import com.sion.pos.interfaces.api.ApiResponse;
+import com.sion.pos.interfaces.api.payment.PaymentCreateRequest;
+import com.sion.pos.interfaces.api.payment.PaymentCreateResponse;
 import com.sion.pos.support.DatabaseCleanUp;
 import com.sion.pos.support.security.ApiTestClient;
-import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -76,7 +77,7 @@ class OrderV1ApiE2ETest {
     class Create {
 
         @Test
-        @DisplayName("유효한 요청이면, 201 Created와 RECEIVED 상태의 주문 정보를 반환한다.")
+        @DisplayName("유효한 요청이면, 201 Created와 PAYMENT_PENDING 상태의 주문 정보를 반환한다.")
         void returnsCreated_whenValidRequest() {
             OrderCreateRequest request = new OrderCreateRequest(
                     List.of(
@@ -95,11 +96,11 @@ class OrderV1ApiE2ETest {
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED),
                     () -> assertThat(response.getBody().storeId()).isEqualTo(storeId),
                     () -> assertThat(response.getBody().orderNumber()).isEqualTo(1),
-                    () -> assertThat(response.getBody().status()).isEqualTo(Order.Status.RECEIVED),
+                    () -> assertThat(response.getBody().status()).isEqualTo(Order.Status.PAYMENT_PENDING),
                     () -> assertThat(response.getBody().totalAmount()).isEqualTo(AMERICANO_PRICE + LATTE_PRICE * 2),
                     () -> assertThat(order.getStoreId()).isEqualTo(storeId),
                     () -> assertThat(order.getOrderNumber()).isEqualTo(1),
-                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED),
+                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING),
                     () -> assertThat(order.getTotalAmount()).isEqualTo(AMERICANO_PRICE + LATTE_PRICE * 2)
             );
 
@@ -166,7 +167,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("이미 결제 완료된 주문이면 409 Conflict를 반환한다.")
         void returnsConflict_whenOrderAlreadyPaid() {
             Long orderId = createOrder();
-            paymentRepository.save(Payment.createOffline(orderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
+            completeOfflinePayment(orderId);
             OrderUpdateItemsRequest request = new OrderUpdateItemsRequest(
                     List.of(new OrderUpdateItemsRequest.Line(latteId, 1)));
 
@@ -200,7 +201,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("결제 완료 주문을 DELIVERED로 변경하면, 204 No Content를 반환하고 대기 목록에서 제외된다.")
         void returnsNoContentAndRemovesFromWaitingOrders_whenStatusDelivered() {
             Long orderId = createOrder();
-            paymentRepository.save(Payment.createOffline(orderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
+            completeOfflinePayment(orderId);
             OrderStatusUpdateRequest request = new OrderStatusUpdateRequest(Order.Status.DELIVERED);
 
             ResponseEntity<Void> response =
@@ -228,7 +229,7 @@ class OrderV1ApiE2ETest {
             Order order = orderRepository.findById(orderId).orElseThrow();
             assertAll(
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
-                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED)
+                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING)
             );
         }
 
@@ -285,7 +286,7 @@ class OrderV1ApiE2ETest {
             Order order = orderRepository.findById(orderId).orElseThrow();
             assertAll(
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
-                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED)
+                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING)
             );
         }
 
@@ -293,7 +294,7 @@ class OrderV1ApiE2ETest {
         @DisplayName("이미 전달 완료된 주문을 취소하려고 하면, 409 Conflict를 반환한다.")
         void returnsConflict_whenCancellingDeliveredOrder() {
             Long orderId = createOrder();
-            paymentRepository.save(Payment.createOffline(orderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
+            completeOfflinePayment(orderId);
             OrderStatusUpdateRequest deliveredRequest = new OrderStatusUpdateRequest(Order.Status.DELIVERED);
             testRestTemplate.exchange(ENDPOINT + "/" + orderId + "/status", HttpMethod.PATCH, new HttpEntity<>(deliveredRequest), Void.class);
 
@@ -363,9 +364,12 @@ class OrderV1ApiE2ETest {
         @DisplayName("오늘 날짜의 접수건만 조회한다.")
         void returnsOnlyTodayReceivedOrders() {
             LocalDate yesterday = LocalDate.now().minusDays(1);
-            Order yesterdayReceivedOrder = orderRepository.save(Order.create(storeId, yesterday, 1, AMERICANO_PRICE));
+            Order yesterdayReceivedOrder = Order.create(storeId, yesterday, 1, AMERICANO_PRICE);
+            yesterdayReceivedOrder.markReceived();
+            orderRepository.save(yesterdayReceivedOrder);
             orderItemRepository.save(OrderItem.create(yesterdayReceivedOrder.getId(), americanoId, "아메리카노", AMERICANO_PRICE, 1));
             Long todayOrderId = createOrder();
+            completeOfflinePayment(todayOrderId);
 
             List<WaitingOrderResponse> waitingOrders = getWaitingOrders();
 
@@ -385,7 +389,7 @@ class OrderV1ApiE2ETest {
             Long firstOrderId = createOrder();
             Long secondOrderId = createOrder();
             Long thirdOrderId = createOrder();
-            paymentRepository.save(Payment.createOffline(firstOrderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
+            completeOfflinePayment(firstOrderId);
             updateOrderStatus(firstOrderId, Order.Status.DELIVERED);
             updateOrderStatus(secondOrderId, Order.Status.CANCELLED);
 
@@ -401,7 +405,7 @@ class OrderV1ApiE2ETest {
                     () -> assertThat(body.orders()).extracting(DailyOrderSummaryResponse.OrderResponse::id)
                                                   .containsExactly(firstOrderId, secondOrderId, thirdOrderId),
                     () -> assertThat(body.orders()).extracting(DailyOrderSummaryResponse.OrderResponse::status)
-                                                  .containsExactly("DELIVERED", "CANCELLED", "RECEIVED")
+                                                  .containsExactly("DELIVERED", "CANCELLED", "PAYMENT_PENDING")
             );
         }
 
@@ -412,7 +416,7 @@ class OrderV1ApiE2ETest {
             Long deliveredOrderId = createOrder();
             Long cancelledOrderId = createOrder();
             createOrder();
-            paymentRepository.save(Payment.createOffline(deliveredOrderId, Payment.Method.CASH, AMERICANO_PRICE, LocalDateTime.now()));
+            completeOfflinePayment(deliveredOrderId);
             updateOrderStatus(deliveredOrderId, Order.Status.DELIVERED);
             updateOrderStatus(cancelledOrderId, Order.Status.CANCELLED);
 
@@ -475,6 +479,15 @@ class OrderV1ApiE2ETest {
                         HttpEntity.EMPTY, new ParameterizedTypeReference<>() {});
 
         return response.getBody();
+    }
+
+    private void completeOfflinePayment(Long orderId) {
+        PaymentCreateRequest request = new PaymentCreateRequest(orderId, Payment.Method.CASH, null);
+        ResponseEntity<PaymentCreateResponse> response =
+                testRestTemplate.exchange("/api/v1/payments", HttpMethod.POST,
+                        new HttpEntity<>(request), PaymentCreateResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     private void updateOrderStatus(Long orderId, Order.Status status) {

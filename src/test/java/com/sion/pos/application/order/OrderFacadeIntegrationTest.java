@@ -64,8 +64,8 @@ class OrderFacadeIntegrationTest {
     class CreateOrder {
 
         @Test
-        @DisplayName("주문은 RECEIVED 상태로 저장되고 총액이 정확히 계산된다")
-        void persistsOrderWithReceivedStatusAndTotalAmount() {
+        @DisplayName("주문은 PAYMENT_PENDING 상태로 저장되고 총액이 정확히 계산된다")
+        void persistsOrderWithPaymentPendingStatusAndTotalAmount() {
             OrderCreateCommand command = new OrderCreateCommand(
                     storeId,
                     List.of(new OrderItemLine(americanoId, 1),
@@ -74,7 +74,7 @@ class OrderFacadeIntegrationTest {
             Order created = orderFacade.createOrder(command);
 
             Order persisted = orderRepository.findById(created.getId()).orElseThrow();
-            assertThat(persisted.getStatus()).isEqualTo(Order.Status.RECEIVED);
+            assertThat(persisted.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING);
             assertThat(persisted.getStoreId()).isEqualTo(storeId);
             assertThat(persisted.getOrderNumber()).isEqualTo(1);
             assertThat(persisted.getTotalAmount()).isEqualTo(AMERICANO_PRICE + LATTE_PRICE * 2);

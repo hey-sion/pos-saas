@@ -100,6 +100,49 @@ class PaymentFacadeIntegrationTest {
         }
 
         @Test
+        @DisplayName("오프라인 결제가 완료되면 주문을 RECEIVED 상태로 변경한다")
+        void marksOrderReceivedWhenOfflinePaymentCompleted() {
+            Order order = createOrderWith(americanoId, 1);
+
+            paymentFacade.createPayment(storeId,
+                    new PaymentCreateCommand(order.getId(), Payment.Method.CARD, null));
+
+            Order paidOrder = orderRepository.findById(order.getId()).orElseThrow();
+            assertThat(paidOrder.getStatus()).isEqualTo(Order.Status.RECEIVED);
+        }
+
+        @Test
+        @DisplayName("결제 수단이 EASY_PAY면 PENDING 상태로 생성하고 주문은 결제 대기 상태를 유지한다")
+        void createsPendingPgPaymentForEasyPay() {
+            Order order = createOrderWith(americanoId, 1);
+
+            PaymentCreateInfo info = paymentFacade.createPayment(storeId,
+                    new PaymentCreateCommand(order.getId(), Payment.Method.EASY_PAY, Payment.Provider.KAKAO_PAY));
+
+            Order persistedOrder = orderRepository.findById(order.getId()).orElseThrow();
+            assertThat(info.status()).isEqualTo(Payment.Status.PENDING);
+            assertThat(info.pg()).isNotNull();
+            assertThat(persistedOrder.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING);
+        }
+
+        @Test
+        @DisplayName("새 결제를 생성하면 기존 PENDING PG 결제 요청을 FAILED 처리한다")
+        void failsExistingPendingPgPaymentWhenCreatingNewPayment() {
+            Order order = createOrderWith(americanoId, 1);
+            PaymentCreateInfo pendingPg = paymentFacade.createPayment(storeId,
+                    new PaymentCreateCommand(order.getId(), Payment.Method.EASY_PAY, Payment.Provider.KAKAO_PAY));
+
+            paymentFacade.createPayment(storeId,
+                    new PaymentCreateCommand(order.getId(), Payment.Method.CARD, null));
+
+            Payment invalidated = paymentRepository.findById(pendingPg.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(invalidated.getStatus()).isEqualTo(Payment.Status.FAILED),
+                    () -> assertThat(invalidated.getFailReason()).isEqualTo("새 결제 요청으로 기존 결제 요청 무효화")
+            );
+        }
+
+        @Test
         @DisplayName("이미 결제 완료된 주문이면 CONFLICT 예외를 발생시킨다")
         void throwsConflictWhenAlreadyCompleted() {
             Order order = createOrderWith(americanoId, 1);
@@ -168,6 +211,19 @@ class PaymentFacadeIntegrationTest {
                     () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.COMPLETED),
                     () -> assertThat(persisted.getPgTransactionKey()).isEqualTo("tx-abc")
             );
+        }
+
+        @Test
+        @DisplayName("PG 결제 검증이 완료되면 주문을 RECEIVED 상태로 변경한다")
+        void marksOrderReceivedWhenPgPaymentVerified() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+
+            paymentFacade.verify(storeId, created.paymentId());
+
+            Order order = orderRepository.findById(created.orderId()).orElseThrow();
+            assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED);
         }
 
         @Test
@@ -263,6 +319,19 @@ class PaymentFacadeIntegrationTest {
                     () -> assertThat(persisted.getPaidAt()).isNotNull(),
                     () -> assertThat(persisted.getPgTransactionKey()).isEqualTo("tx-webhook")
             );
+        }
+
+        @Test
+        @DisplayName("PG 웹훅 결제가 완료되면 주문을 RECEIVED 상태로 변경한다")
+        void marksOrderReceivedWhenWebhookPaymentCompleted() {
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-webhook", null));
+
+            paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId());
+
+            Order order = orderRepository.findById(created.orderId()).orElseThrow();
+            assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED);
         }
 
         @Test

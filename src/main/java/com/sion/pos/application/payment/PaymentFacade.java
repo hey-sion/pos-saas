@@ -4,6 +4,7 @@ import com.sion.pos.application.order.OrderService;
 import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
+import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.domain.payment.PaymentGateway;
 import com.sion.pos.domain.payment.PaymentGatewayResult;
@@ -32,6 +33,7 @@ public class PaymentFacade {
 
     private final OrderService orderService;
     private final OrderItemRepository orderItemRepository;
+    private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
     private final PortOneProperties portOneProperties;
@@ -39,16 +41,19 @@ public class PaymentFacade {
     @Transactional
     public PaymentCreateInfo createPayment(Long storeId, PaymentCreateCommand command) {
         Order order = orderService.getOrder(storeId, command.orderId());
-        if (order.getStatus() != Order.Status.RECEIVED) {
+        if (order.getStatus() != Order.Status.PAYMENT_PENDING) {
             throw new PosApplicationException(ErrorType.CONFLICT,
                     "결제할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
         }
 
-        boolean alreadyCompleted = paymentRepository.findByOrderIdIn(List.of(order.getId())).stream()
-                                                    .anyMatch(payment -> payment.getStatus() == Payment.Status.COMPLETED);
+        List<Payment> payments = paymentRepository.findByOrderIdIn(List.of(order.getId()));
+        boolean alreadyCompleted = payments.stream()
+                                           .anyMatch(payment -> payment.getStatus() == Payment.Status.COMPLETED);
         if (alreadyCompleted) {
             throw new PosApplicationException(ErrorType.CONFLICT, "이미 결제 완료된 주문입니다.");
         }
+
+        invalidatePendingPgPayments(payments);
 
         if (command.method() == Payment.Method.EASY_PAY) {
             Payment payment = paymentRepository.save(Payment.createPg(
@@ -69,6 +74,7 @@ public class PaymentFacade {
                 command.method(),
                 order.getTotalAmount(),
                 LocalDateTime.now(BUSINESS_ZONE)));
+        order.markReceived();
         return PaymentCreateInfo.offline(payment);
     }
 
@@ -128,7 +134,16 @@ public class PaymentFacade {
                     return;
                 }
 
-                paymentRepository.completeIfPending(payment.getId(), LocalDateTime.now(BUSINESS_ZONE), result.transactionKey());
+                int completed = paymentRepository.completeIfPending(
+                        payment.getId(),
+                        LocalDateTime.now(BUSINESS_ZONE),
+                        result.transactionKey());
+                if (completed == 1) {
+                    Order order = orderRepository.findById(payment.getOrderId())
+                                                 .orElseThrow(() -> new PosApplicationException(
+                                                         ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+                    order.markReceived();
+                }
             }
             case FAILED -> paymentRepository.failIfPending(payment.getId(), result.failReason());
             case PENDING -> {
@@ -139,6 +154,13 @@ public class PaymentFacade {
 
     private String generatePgPaymentId() {
         return "easypay-" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private void invalidatePendingPgPayments(List<Payment> payments) {
+        payments.stream()
+                .filter(payment -> payment.getChannel() == Payment.Channel.PG)
+                .filter(payment -> payment.getStatus() == Payment.Status.PENDING)
+                .forEach(payment -> payment.fail("새 결제 요청으로 기존 결제 요청 무효화"));
     }
 
     private String buildOrderName(Long orderId) {

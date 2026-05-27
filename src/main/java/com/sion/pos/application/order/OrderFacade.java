@@ -70,9 +70,9 @@ public class OrderFacade {
         validateLines(command.items());
 
         Order order = orderService.getOrder(storeId, orderId);
-        if (order.getStatus() != Order.Status.RECEIVED) {
+        if (order.getStatus() != Order.Status.PAYMENT_PENDING) {
             throw new PosApplicationException(ErrorType.CONFLICT,
-                    "주문 접수 상태에서만 수정 가능합니다. 현재 상태: " + order.getStatus());
+                    "결제 대기 상태에서만 수정 가능합니다. 현재 상태: " + order.getStatus());
         }
 
         List<Payment> payments = paymentRepository.findByOrderIdIn(List.of(order.getId()));

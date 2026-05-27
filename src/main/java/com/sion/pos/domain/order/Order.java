@@ -37,7 +37,7 @@ public class Order extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private Status status = Status.RECEIVED;
+    private Status status = Status.PAYMENT_PENDING;
 
     @Column(name = "total_amount", nullable = false)
     private Integer totalAmount;
@@ -61,8 +61,15 @@ public class Order extends BaseEntity {
         order.orderDate = orderDate;
         order.orderNumber = orderNumber;
         order.totalAmount = totalAmount;
-        order.status = Status.RECEIVED;
+        order.status = Status.PAYMENT_PENDING;
         return order;
+    }
+
+    public void markReceived() {
+        if (this.status != Status.PAYMENT_PENDING) {
+            throw new PosApplicationException(ErrorType.CONFLICT, "결제 대기 상태에서만 접수 처리 가능합니다. 현재 상태: " + this.status);
+        }
+        this.status = Status.RECEIVED;
     }
 
     public void deliver() {
@@ -73,16 +80,16 @@ public class Order extends BaseEntity {
     }
 
     public void cancel() {
-        if (this.status != Status.RECEIVED) {
-            throw new PosApplicationException(ErrorType.CONFLICT, "주문 접수 상태에서만 취소 처리 가능합니다. 현재 상태: " + this.status);
+        if (this.status != Status.PAYMENT_PENDING && this.status != Status.RECEIVED) {
+            throw new PosApplicationException(ErrorType.CONFLICT, "결제 대기 또는 접수 상태에서만 취소 처리 가능합니다. 현재 상태: " + this.status);
         }
 
         this.status = Status.CANCELLED;
     }
 
     public void changeTotalAmount(Integer totalAmount) {
-        if (this.status != Status.RECEIVED) {
-            throw new PosApplicationException(ErrorType.CONFLICT, "주문 접수 상태에서만 수정 가능합니다. 현재 상태: " + this.status);
+        if (this.status != Status.PAYMENT_PENDING) {
+            throw new PosApplicationException(ErrorType.CONFLICT, "결제 대기 상태에서만 수정 가능합니다. 현재 상태: " + this.status);
         }
         if (totalAmount == null || totalAmount <= 0) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "totalAmount는 1 이상이어야 합니다.");
@@ -92,6 +99,7 @@ public class Order extends BaseEntity {
     }
 
     public enum Status {
+        PAYMENT_PENDING,
         RECEIVED,
         DELIVERED,
         CANCELLED
