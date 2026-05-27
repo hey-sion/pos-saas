@@ -29,6 +29,9 @@ public class SecurityConfig {
     private static final String WEBHOOK_PATH = "/api/v1/payments/webhook/portone";
     private static final String WEBHOOK_PATTERN = WEBHOOK_PATH + "/**";
 
+    /** 손님 QR 셀프주문: 세션 없이 진입하는 공개 경로. storeId는 URL path로 받는다(사장님 경로의 @LoginStore 세션과 대비). */
+    private static final String CUSTOMER_API_PATTERN = "/api/v1/customer/**";
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -39,6 +42,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN).permitAll()
+                        .requestMatchers(CUSTOMER_API_PATTERN).permitAll()
                         .requestMatchers("/login", "/css/**", "/js/**", "/favicon.ico", "/error").permitAll()
                         // default-deny: 공개 경로만 위에서 열고 나머지는 전부 인증 필요
                         .anyRequest().authenticated()
