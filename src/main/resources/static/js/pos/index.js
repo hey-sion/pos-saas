@@ -354,7 +354,7 @@ async function handleEasyPayPayment(provider) {
 
         await refreshWaitingOrders();
     } catch {
-        showToast("결제 처리에 실패했습니다");
+        showToast("결제 확인 중입니다. 잠시 후 화면을 새로고침해주세요");
     } finally {
         state.paymentInProgress = false;
         setPaymentMethodButtonsDisabled(false);
