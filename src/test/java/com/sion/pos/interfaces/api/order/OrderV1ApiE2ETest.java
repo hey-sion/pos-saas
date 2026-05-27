@@ -383,12 +383,12 @@ class OrderV1ApiE2ETest {
     class DailySummary {
 
         @Test
-        @DisplayName("전체 주문을 주문번호 오름차순으로 반환한다.")
+        @DisplayName("결제 대기 주문은 제외하고, 접수된 주문을 주문번호 오름차순으로 반환한다.")
         void returnsOrdersOrderedByOrderNumber() {
             LocalDate today = LocalDate.now();
             Long firstOrderId = createOrder();
             Long secondOrderId = createOrder();
-            Long thirdOrderId = createOrder();
+            createOrder(); // 결제 대기(PAYMENT_PENDING) — 요약에서 제외된다
             completeOfflinePayment(firstOrderId);
             updateOrderStatus(firstOrderId, Order.Status.DELIVERED);
             updateOrderStatus(secondOrderId, Order.Status.CANCELLED);
@@ -401,11 +401,11 @@ class OrderV1ApiE2ETest {
             assertAll(
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                     () -> assertThat(body.date()).isEqualTo(today),
-                    () -> assertThat(body.totalOrderCount()).isEqualTo(3),
+                    () -> assertThat(body.totalOrderCount()).isEqualTo(2),
                     () -> assertThat(body.orders()).extracting(DailyOrderSummaryResponse.OrderResponse::id)
-                                                  .containsExactly(firstOrderId, secondOrderId, thirdOrderId),
+                                                  .containsExactly(firstOrderId, secondOrderId),
                     () -> assertThat(body.orders()).extracting(DailyOrderSummaryResponse.OrderResponse::status)
-                                                  .containsExactly("DELIVERED", "CANCELLED", "PAYMENT_PENDING")
+                                                  .containsExactly("DELIVERED", "CANCELLED")
             );
         }
 
@@ -415,7 +415,7 @@ class OrderV1ApiE2ETest {
             LocalDate today = LocalDate.now();
             Long deliveredOrderId = createOrder();
             Long cancelledOrderId = createOrder();
-            createOrder();
+            createOrder(); // 결제 대기(PAYMENT_PENDING) — 전체 건수에서 제외된다
             completeOfflinePayment(deliveredOrderId);
             updateOrderStatus(deliveredOrderId, Order.Status.DELIVERED);
             updateOrderStatus(cancelledOrderId, Order.Status.CANCELLED);
@@ -429,7 +429,7 @@ class OrderV1ApiE2ETest {
                     () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                     () -> assertThat(body.salesAmount()).isEqualTo(AMERICANO_PRICE),
                     () -> assertThat(body.salesOrderCount()).isEqualTo(1),
-                    () -> assertThat(body.totalOrderCount()).isEqualTo(3)
+                    () -> assertThat(body.totalOrderCount()).isEqualTo(2)
             );
         }
 

@@ -13,7 +13,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             Order.Status status
     );
 
-    List<Order> findByStoreIdAndOrderDateOrderByOrderNumberAsc(Long storeId, LocalDate orderDate);
+    List<Order> findByStoreIdAndOrderDateAndStatusInOrderByOrderNumberAsc(
+            Long storeId,
+            LocalDate orderDate,
+            List<Order.Status> statuses
+    );
 
     Optional<Order> findByIdAndStoreId(Long id, Long storeId);
 }

@@ -24,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
+    // 결제 대기(PAYMENT_PENDING)는 일별 요약·정산에서 제외한다. 접수·완료·취소만 집계.
+    private static final List<Order.Status> SUMMARY_STATUSES =
+            List.of(Order.Status.RECEIVED, Order.Status.DELIVERED, Order.Status.CANCELLED);
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -79,7 +82,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public DailyOrderSummaryInfo getDailySummary(Long storeId, LocalDate date) {
-        List<Order> orders = orderRepository.findByStoreIdAndOrderDateOrderByOrderNumberAsc(storeId, date);
+        List<Order> orders = orderRepository.findByStoreIdAndOrderDateAndStatusInOrderByOrderNumberAsc(storeId, date, SUMMARY_STATUSES);
         if (orders.isEmpty()) {
             return new DailyOrderSummaryInfo(date, 0, 0, 0, List.of());
         }
