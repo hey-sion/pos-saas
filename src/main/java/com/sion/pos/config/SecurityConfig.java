@@ -29,7 +29,10 @@ public class SecurityConfig {
     private static final String WEBHOOK_PATH = "/api/v1/payments/webhook/portone";
     private static final String WEBHOOK_PATTERN = WEBHOOK_PATH + "/**";
 
-    /** 손님 QR 셀프주문: 세션 없이 진입하는 공개 경로. storeId는 URL path로 받는다(사장님 경로의 @LoginStore 세션과 대비). */
+    /**
+     * 손님 QR 셀프주문: 세션 없이 진입하는 공개 경로. storeId는 URL path로 받는다(사장님 경로의 @LoginStore 세션과 대비).
+     * 공개 POST(주문 생성)는 보호할 인증 세션이 없어 CSRF에서 제외한다(웹훅과 동일 논리). 스팸/악용은 별개 위협이라 운영 방어로 다룬다.
+     */
     private static final String CUSTOMER_API_PATTERN = "/api/v1/customer/**";
 
     @Bean
@@ -66,7 +69,7 @@ public class SecurityConfig {
                         // 비-XOR 핸들러를 써서 쿠키 토큰 == 기대 토큰이 되도록(헤더 검증 단순화, BREACH 보호는 트레이드오프).
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                        .ignoringRequestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN)
+                        .ignoringRequestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN, CUSTOMER_API_PATTERN)
                 )
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
 
