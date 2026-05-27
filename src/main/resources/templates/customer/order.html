@@ -1,0 +1,425 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>고객 주문</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f5f6f8;
+            --white: #ffffff;
+            --gray-50: #f9fafb;
+            --gray-100: #f2f4f6;
+            --gray-200: #e5e8eb;
+            --gray-300: #d1d6db;
+            --gray-400: #b0b8c1;
+            --gray-500: #8b95a1;
+            --gray-600: #6b7684;
+            --gray-700: #4e5968;
+            --gray-800: #333d4b;
+            --gray-900: #191f28;
+            --blue-50: #e8f3ff;
+            --blue-100: #c9e2ff;
+            --blue-500: #3182f6;
+            --blue-600: #1b64da;
+            --green-50: #e8faf5;
+            --green-500: #2bc484;
+            --yellow-50: #fff8e6;
+            --yellow-500: #f5c542;
+            --red-50: #fff0f0;
+            --red-500: #f44336;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+            --font: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        }
+
+        html {
+            background: var(--bg);
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--gray-900);
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button {
+            font: inherit;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .page {
+            min-height: 100vh;
+            padding-bottom: calc(164px + env(safe-area-inset-bottom));
+        }
+
+        .top-bar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 60px;
+            padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+            border-bottom: 1px solid var(--gray-200);
+            background: rgba(255,255,255,0.94);
+            backdrop-filter: blur(12px);
+        }
+
+        .store-meta {
+            min-width: 0;
+        }
+
+        .store-label {
+            margin-bottom: 2px;
+            color: var(--gray-500);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .store-name {
+            overflow: hidden;
+            color: var(--gray-900);
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1.25;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .hero {
+            padding: 16px;
+        }
+
+        .notice {
+            display: grid;
+            grid-template-columns: 40px minmax(0, 1fr);
+            gap: 12px;
+            align-items: center;
+            padding: 14px;
+            border: 1px solid var(--blue-100);
+            border-radius: var(--radius-md);
+            background: var(--white);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .notice-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            background: var(--blue-50);
+            color: var(--blue-500);
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .notice-title {
+            color: var(--gray-900);
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        .notice-desc {
+            margin-top: 2px;
+            color: var(--gray-500);
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.45;
+        }
+
+        .content {
+            display: grid;
+            gap: 14px;
+            width: min(100%, 960px);
+            margin: 0 auto;
+            padding: 0 16px 24px;
+        }
+
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 4px 2px 0;
+        }
+
+        .section-title {
+            color: var(--gray-800);
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .menu-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .menu-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: center;
+            min-height: 86px;
+            padding: 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md);
+            background: var(--white);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .menu-info {
+            min-width: 0;
+        }
+
+        .menu-name {
+            color: var(--gray-900);
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.35;
+            word-break: keep-all;
+        }
+
+        .menu-price {
+            margin-top: 8px;
+            color: var(--gray-800);
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .add-button {
+            flex: 0 0 auto;
+            width: 44px;
+            height: 44px;
+            border: 1px solid var(--blue-100);
+            border-radius: 50%;
+            background: var(--blue-50);
+            color: var(--blue-500);
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .add-button:active {
+            transform: scale(0.96);
+        }
+
+        .cart-sheet {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 30;
+            border-top: 1px solid var(--gray-200);
+            background: var(--white);
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.08);
+        }
+
+        .cart-inner {
+            width: min(100%, 960px);
+            margin: 0 auto;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+        }
+
+        .cart-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .cart-label {
+            color: var(--gray-600);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .cart-amount {
+            color: var(--gray-900);
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .cart-preview {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            min-height: 34px;
+            margin-bottom: 10px;
+            scrollbar-width: none;
+        }
+
+        .cart-preview::-webkit-scrollbar {
+            display: none;
+        }
+
+        .cart-chip {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            height: 34px;
+            padding: 0 10px;
+            border: 0;
+            border-radius: 99px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .chip-remove {
+            color: var(--gray-400);
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .cart-chip .qty {
+            color: var(--blue-500);
+        }
+
+        .submit-button {
+            width: 100%;
+            height: 54px;
+            border: 0;
+            border-radius: var(--radius-sm);
+            background: var(--blue-500);
+            color: var(--white);
+            font-size: 17px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .submit-button:disabled {
+            background: var(--gray-300);
+            cursor: default;
+        }
+
+        .empty-state {
+            padding: 40px 16px;
+            border: 1px dashed var(--gray-300);
+            border-radius: var(--radius-md);
+            background: var(--white);
+            color: var(--gray-500);
+            text-align: center;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: calc(180px + env(safe-area-inset-bottom));
+            z-index: 40;
+            max-width: calc(100% - 32px);
+            padding: 12px 18px;
+            border-radius: 99px;
+            background: var(--gray-900);
+            color: var(--white);
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+            opacity: 0;
+            transform: translate(-50%, 8px);
+            transition: opacity 0.2s, transform 0.2s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        @media (min-width: 720px) {
+            .page {
+                padding-bottom: calc(138px + env(safe-area-inset-bottom));
+            }
+
+            .top-bar {
+                padding-right: 24px;
+                padding-left: 24px;
+            }
+
+            .hero {
+                width: min(100%, 960px);
+                margin: 0 auto;
+                padding: 20px 24px 16px;
+            }
+
+            .content {
+                padding-right: 24px;
+                padding-left: 24px;
+            }
+
+            .menu-list {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .cart-inner {
+                padding-right: 24px;
+                padding-left: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="page" th:attr="data-store-id=${storeId}">
+    <header class="top-bar">
+        <div class="store-meta">
+            <p class="store-label">QR 셀프주문</p>
+            <h1 class="store-name" id="storeName" th:text="${storeName}">매장명</h1>
+        </div>
+    </header>
+
+    <section class="hero" aria-label="주문 안내">
+        <div class="notice">
+            <div class="notice-icon" aria-hidden="true">✓</div>
+            <div>
+                <p class="notice-title">메뉴를 담고 결제하면 주문이 접수돼요</p>
+                <p class="notice-desc">결제 완료 후 사장님 대기화면에 주문이 표시됩니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="content" aria-label="메뉴 선택">
+        <div class="section-head">
+            <h2 class="section-title">메뉴</h2>
+        </div>
+
+        <div class="menu-list" id="menuList"></div>
+
+        <div class="empty-state" id="emptyMenuMessage" hidden>주문 가능한 메뉴가 없습니다.</div>
+    </section>
+</main>
+
+<aside class="cart-sheet" aria-label="장바구니">
+    <div class="cart-inner">
+        <div class="cart-summary">
+            <span class="cart-label">담은 메뉴 <span id="cartCount">0</span>개</span>
+            <strong class="cart-amount" id="cartTotal">0원</strong>
+        </div>
+        <div class="cart-preview" id="cartPreview"></div>
+        <button class="submit-button" id="submitOrderButton" type="button" disabled>주문하고 결제하기</button>
+    </div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/js/customer/order.js"></script>
+</body>
+</html>

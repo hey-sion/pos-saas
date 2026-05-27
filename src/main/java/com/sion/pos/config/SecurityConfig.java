@@ -34,6 +34,8 @@ public class SecurityConfig {
      * 공개 POST(주문 생성)는 보호할 인증 세션이 없어 CSRF에서 제외한다(웹훅과 동일 논리). 스팸/악용은 별개 위협이라 운영 방어로 다룬다.
      */
     private static final String CUSTOMER_API_PATTERN = "/api/v1/customer/**";
+    /** 손님 주문 화면. `/order/{storeId}` 한 세그먼트만 공개(와일드카드 X — 하위 경로 자동 공개 방지). */
+    private static final String CUSTOMER_PAGE_PATTERN = "/order/*";
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -45,7 +47,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN).permitAll()
-                        .requestMatchers(CUSTOMER_API_PATTERN).permitAll()
+                        .requestMatchers(CUSTOMER_API_PATTERN, CUSTOMER_PAGE_PATTERN).permitAll()
                         .requestMatchers("/login", "/css/**", "/js/**", "/favicon.ico", "/error").permitAll()
                         // default-deny: 공개 경로만 위에서 열고 나머지는 전부 인증 필요
                         .anyRequest().authenticated()
