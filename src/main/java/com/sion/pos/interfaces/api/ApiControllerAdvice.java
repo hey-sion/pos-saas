@@ -18,7 +18,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "com.sion.pos.interfaces.api")
 @Slf4j
 public class ApiControllerAdvice {
 

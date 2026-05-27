@@ -1,0 +1,117 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>주문 화면 안내</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f5f6f8;
+            --white: #ffffff;
+            --gray-100: #f2f4f6;
+            --gray-200: #e5e8eb;
+            --gray-500: #8b95a1;
+            --gray-700: #4e5968;
+            --gray-900: #191f28;
+            --red-50: #fff0f0;
+            --red-500: #f44336;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --font: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        }
+
+        html {
+            background: var(--bg);
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--gray-900);
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .page {
+            display: grid;
+            min-height: 100vh;
+            padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+            place-items: center;
+        }
+
+        .notice {
+            display: grid;
+            gap: 16px;
+            width: min(100%, 420px);
+            padding: 22px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md);
+            background: var(--white);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .notice-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-sm);
+            background: var(--red-50);
+            color: var(--red-500);
+            font-size: 24px;
+            font-weight: 900;
+        }
+
+        .title {
+            color: var(--gray-900);
+            font-size: 21px;
+            font-weight: 900;
+            line-height: 1.35;
+            word-break: keep-all;
+        }
+
+        .message {
+            color: var(--gray-700);
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.5;
+            word-break: keep-all;
+        }
+
+        .desc {
+            padding-top: 2px;
+            color: var(--gray-500);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.5;
+            word-break: keep-all;
+        }
+
+        @media (max-width: 360px) {
+            .notice {
+                padding: 18px;
+            }
+
+            .title {
+                font-size: 19px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="page">
+    <section class="notice">
+        <div class="notice-icon">!</div>
+        <div>
+            <h1 class="title" th:text="${title}">주문 화면을 열 수 없습니다.</h1>
+            <p class="message" th:text="${message}">존재하지 않는 매장입니다.</p>
+        </div>
+        <p class="desc" th:text="${guide}">QR 코드를 다시 확인해 주세요.</p>
+    </section>
+</main>
+</body>
+</html>
