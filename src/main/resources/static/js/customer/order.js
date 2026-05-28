@@ -167,7 +167,7 @@ function showVerifyResult(verified, orderNumber, pgOk = true) {
             saveLastOrder(orderNumber);
             renderOrderBanner();
         }
-        showToast(orderNumber ? `주문번호 ${orderNumber}번의 결제가 완료됐어요` : "결제가 완료됐어요");
+        showToast(orderNumber ? `주문이 접수되었어요.\n주문번호 ${orderNumber}번으로 확인해주세요.` : "결제가 완료됐어요");
         resetCart();
     } else if (verified.status === "FAILED") {
         showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
@@ -336,5 +336,5 @@ function showToast(message) {
     toast.classList.remove("show");
     void toast.offsetWidth;
     toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 2400);
+    setTimeout(() => toast.classList.remove("show"), 3000);
 }

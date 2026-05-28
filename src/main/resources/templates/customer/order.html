@@ -381,30 +381,35 @@
             }
         }
 
-        /* 결제 완료 후 30분간 손님 자기 주문번호를 보여주는 상단 배너. localStorage TTL 기반. */
-        .banner-wrap {
-            width: min(100%, 960px);
-            margin: 0 auto;
-            padding: 0 16px;
-        }
-
-        .order-banner {
-            display: flex;
+        .order-pill {
+            flex: 0 0 auto;
+            display: inline-flex;
             align-items: center;
-            justify-content: center;
             gap: 8px;
-            padding: 14px 18px;
+            padding: 8px 14px;
             border: 1px solid var(--blue-100);
-            border-radius: var(--radius-md);
+            border-radius: 999px;
             background: var(--blue-50);
             color: var(--gray-800);
-            font-size: 15px;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .order-pill[hidden] {
+            display: none;
+        }
+
+        .order-pill-label {
+            color: var(--gray-500);
+            font-size: 13px;
             font-weight: 700;
         }
 
-        .order-banner-number {
+        .order-pill-number {
             color: var(--blue-500);
-            font-size: 22px;
+            font-size: 18px;
             font-weight: 900;
         }
     </style>
@@ -416,6 +421,10 @@
             <p class="store-label">QR 셀프주문</p>
             <h1 class="store-name" id="storeName" th:text="${storeName}">매장명</h1>
         </div>
+        <aside class="order-pill" id="orderBannerSection" hidden aria-label="내 최근 주문" aria-live="polite">
+            <span class="order-pill-label">내 주문번호</span>
+            <strong class="order-pill-number">#<span id="orderBannerNumber"></span></strong>
+        </aside>
     </header>
 
     <section class="hero" aria-label="주문 안내">
@@ -426,12 +435,6 @@
                 <p class="notice-desc">결제 완료 후 사장님 대기화면에 주문이 표시됩니다.</p>
             </div>
         </div>
-    </section>
-
-    <section class="banner-wrap" id="orderBannerSection" hidden aria-label="내 최근 주문">
-        <aside class="order-banner" aria-live="polite">
-            주문번호 <strong class="order-banner-number">#<span id="orderBannerNumber"></span>번</strong>
-        </aside>
     </section>
 
     <section class="content" aria-label="메뉴 선택">
