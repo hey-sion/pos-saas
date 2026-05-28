@@ -469,6 +469,17 @@ async function refreshWaitingOrders() {
     renderWaitingOrders();
 }
 
+// 손님 QR 셀프주문/결제가 비동기로 들어오므로 3초 폴링으로 대기 목록을 갱신한다.
+// 결제 진행 중에는 스킵(슬롯 재렌더로 인한 깜빡임·불필요한 요청 방지). 실시간성이 더 중요해지면 SSE로 교체.
+function startWaitingOrdersPolling() {
+    setInterval(() => {
+        if (state.paymentInProgress) {
+            return;
+        }
+        refreshWaitingOrders();
+    }, 3000);
+}
+
 function renderWaitingOrders() {
     const slots = document.getElementById("slots");
     const emptySlots = document.getElementById("emptySlots");
@@ -693,4 +704,5 @@ document.addEventListener("DOMContentLoaded", () => {
     loadMenus();
     renderCart();
     refreshWaitingOrders();
+    startWaitingOrdersPolling();
 });
