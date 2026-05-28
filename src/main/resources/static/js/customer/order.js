@@ -10,8 +10,13 @@ const state = {
     submitting: false
 };
 
+// 결제 완료 후 상단 배너에서 주문번호 30분간 확인 가능
+const ORDER_BANNER_TTL_MS = 30 * 60 * 1000;
+const LAST_ORDER_KEY = "pos:lastOrder";
+
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("submitOrderButton").addEventListener("click", submitOrder);
+    renderOrderBanner();
     loadMenus();
     renderCart();
     handlePaymentReturn();
@@ -116,7 +121,7 @@ function createCartChip(item) {
 }
 
 // 주문 생성 + 결제를 한 단위로 묶은 진입점. 카카오페이 단일이라 수단 선택 모달 없이 바로 결제까지 진행한다.
-// 통신 오류는 결제 실패로 단정하지 않는다(이중청구 오인 방지) — 확인 중 + 새로고침 안내로.
+// phase 분리: PG 호출 전(생성)과 PG SDK 실패는 "진행 불가"로 단정, verify HTTP 실패만 모호 처리(이중청구 오인 방지).
 async function submitOrder() {
     if (state.cart.size === 0 || state.submitting) {
         return;
@@ -126,18 +131,28 @@ async function submitOrder() {
     renderCart();
 
     try {
-        const order = await createOrder();
-        const created = await createPayment(order.id);
+        let order, created;
+        try {
+            order = await createOrder();
+            created = await createPayment(order.id);
+        } catch {
+            showToast("결제를 진행할 수 없어요. 직원에게 문의해주세요");
+            return;
+        }
 
         // 모바일(카카오페이 REDIRECTION)은 여기서 카카오로 이탈했다가 redirectUrl로 복귀 → 복귀 시 handlePaymentReturn에서 verify.
         // PC(IFRAME)는 인라인 복귀라 아래 verify가 이어서 실행된다.
         const redirectUrl = `${location.origin}/order/${storeId}?verifyPaymentId=${created.payment.id}&orderNumber=${order.orderNumber}`;
-        await requestPortOne(created.pg, redirectUrl);
+        const pgOk = await requestPortOne(created.pg, redirectUrl);
 
-        const verified = await verifyPayment(created.payment.id);
-        showVerifyResult(verified, order.orderNumber);
-    } catch {
-        showToast("결제 확인 중이에요. 잠시 후 화면을 새로고침해주세요");
+        try {
+            const verified = await verifyPayment(created.payment.id);
+            showVerifyResult(verified, order.orderNumber, pgOk);
+        } catch {
+            showToast(pgOk
+                ? "결제 확인에 실패했어요. 직원에게 문의해주세요"
+                : "결제를 진행할 수 없어요. 직원에게 문의해주세요");
+        }
     } finally {
         state.submitting = false;
         renderCart();
@@ -145,14 +160,21 @@ async function submitOrder() {
 }
 
 // 모바일 리다이렉트 복귀와 PC 인라인 결제가 공유하는 결과 처리.
-function showVerifyResult(verified, orderNumber) {
+// pgOk=false면 PG 자체가 안 떴다는 신호 — PENDING이어도 결제 진행 불가로 단정.
+function showVerifyResult(verified, orderNumber, pgOk = true) {
     if (verified.status === "COMPLETED") {
+        if (orderNumber) {
+            saveLastOrder(orderNumber);
+            renderOrderBanner();
+        }
         showToast(orderNumber ? `주문번호 ${orderNumber}번의 결제가 완료됐어요` : "결제가 완료됐어요");
         resetCart();
     } else if (verified.status === "FAILED") {
         showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
     } else {
-        showToast("결제 확인 중이에요. 잠시 후 다시 시도해주세요");
+        showToast(pgOk
+            ? "결제 확인 중이에요. 잠시 후 다시 시도해주세요"
+            : "결제를 진행할 수 없어요. 직원에게 문의해주세요");
     }
 }
 
@@ -185,9 +207,11 @@ async function createPayment(orderId) {
     return response.json();
 }
 
+// PG 호출 성공 여부를 반환 — 결제창이 못 떴거나 SDK가 code 달린 결과 돌려주면 false.
+// 모바일은 redirect로 떠나가서 resolve가 안 되니 호출자가 결과를 보지 않음(handlePaymentReturn 흐름).
 async function requestPortOne(pg, redirectUrl) {
     if (typeof PortOne === "undefined" || !PortOne.requestPayment) {
-        return;
+        return false;
     }
 
     // 결제창 호출 시점의 body 자식만 hide(PortOne wrapper는 호출 후 추가되어 영향 없음).
@@ -196,7 +220,7 @@ async function requestPortOne(pg, redirectUrl) {
     childrenBefore.forEach(el => el.style.visibility = "hidden");
 
     try {
-        await PortOne.requestPayment({
+        const result = await PortOne.requestPayment({
             storeId: pg.storeId,
             channelKey: pg.channelKey,
             paymentId: pg.paymentId,
@@ -209,8 +233,12 @@ async function requestPortOne(pg, redirectUrl) {
             windowType: {pc: "IFRAME", mobile: "REDIRECTION"},
             redirectUrl
         });
+        // PortOne v2: 에러 시 result.code 포함된 객체로 resolve.
+        return !(result && result.code);
     } catch {
         // SDK 예외는 단정하지 않고 후속 verify(백엔드 단건 조회)로 권위있는 상태를 확인한다.
+        // false 반환은 PENDING/verify 실패 시 메시지 분기용 힌트일 뿐, verify의 COMPLETED/FAILED 판정은 그대로 우선.
+        return false;
     } finally {
         childrenBefore.forEach(el => el.style.visibility = "");
     }
@@ -242,8 +270,54 @@ async function handlePaymentReturn() {
         const verified = await verifyPayment(verifyPaymentId);
         showVerifyResult(verified, orderNumber);
     } catch {
-        showToast("결제 확인 중이에요. 잠시 후 화면을 새로고침해주세요");
+        showToast("결제 확인에 실패했어요. 직원에게 문의해주세요");
     }
+}
+
+// 최근 주문을 localStorage에 저장 — 페이지 새로고침/재진입 시에도 자기 주문번호 확인 가능.
+// 매장 분리: storeId까지 같이 저장해서 다른 매장 QR로 진입 시 보이지 않게.
+function saveLastOrder(orderNumber) {
+    try {
+        localStorage.setItem(LAST_ORDER_KEY, JSON.stringify({
+            storeId,
+            orderNumber: Number(orderNumber),
+            ts: Date.now()
+        }));
+    } catch {
+        // localStorage 접근 불가(시크릿 모드/용량초과 등) — 배너 미동작 허용.
+    }
+}
+
+function readLastOrder() {
+    try {
+        const raw = localStorage.getItem(LAST_ORDER_KEY);
+        if (!raw) {
+            return null;
+        }
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.storeId !== storeId) {
+            return null;
+        }
+        if (Date.now() - parsed.ts > ORDER_BANNER_TTL_MS) {
+            localStorage.removeItem(LAST_ORDER_KEY);
+            return null;
+        }
+        return parsed;
+    } catch {
+        return null;
+    }
+}
+
+function renderOrderBanner() {
+    const section = document.getElementById("orderBannerSection");
+    const numberEl = document.getElementById("orderBannerNumber");
+    const last = readLastOrder();
+    if (!last) {
+        section.hidden = true;
+        return;
+    }
+    numberEl.textContent = String(last.orderNumber);
+    section.hidden = false;
 }
 
 function resetCart() {

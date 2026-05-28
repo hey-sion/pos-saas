@@ -374,6 +374,38 @@
                 padding-right: 24px;
                 padding-left: 24px;
             }
+
+            .banner-wrap {
+                padding-right: 24px;
+                padding-left: 24px;
+            }
+        }
+
+        /* 결제 완료 후 30분간 손님 자기 주문번호를 보여주는 상단 배너. localStorage TTL 기반. */
+        .banner-wrap {
+            width: min(100%, 960px);
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        .order-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 18px;
+            border: 1px solid var(--blue-100);
+            border-radius: var(--radius-md);
+            background: var(--blue-50);
+            color: var(--gray-800);
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .order-banner-number {
+            color: var(--blue-500);
+            font-size: 22px;
+            font-weight: 900;
         }
     </style>
 </head>
@@ -394,6 +426,12 @@
                 <p class="notice-desc">결제 완료 후 사장님 대기화면에 주문이 표시됩니다.</p>
             </div>
         </div>
+    </section>
+
+    <section class="banner-wrap" id="orderBannerSection" hidden aria-label="내 최근 주문">
+        <aside class="order-banner" aria-live="polite">
+            주문번호 <strong class="order-banner-number">#<span id="orderBannerNumber"></span>번</strong>
+        </aside>
     </section>
 
     <section class="content" aria-label="메뉴 선택">
