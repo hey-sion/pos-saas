@@ -19,6 +19,11 @@ import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -154,6 +159,44 @@ class OrderFacadeIntegrationTest {
         }
 
         @Test
+        @DisplayName("동시에 주문을 생성해도 같은 매장/날짜의 orderNumber가 중복되지 않는다")
+        void createsOrdersWithUniqueOrderNumbersConcurrently() {
+            int requestCount = 20;
+            ExecutorService executorService = Executors.newFixedThreadPool(8);
+            CountDownLatch startLatch = new CountDownLatch(1);
+
+            try {
+                List<CompletableFuture<Order>> futures = IntStream.range(0, requestCount)
+                        .mapToObj(i -> CompletableFuture.supplyAsync(() -> {
+                            await(startLatch);
+                            return orderFacade.createOrder(new OrderCreateCommand(
+                                    storeId,
+                                    List.of(new OrderItemLine(americanoId, 1))));
+                        }, executorService))
+                        .toList();
+                startLatch.countDown();
+
+                List<Order> createdOrders = futures.stream()
+                        .map(CompletableFuture::join)
+                        .toList();
+                List<Order> persistedOrders = orderRepository.findAll().stream()
+                        .filter(order -> order.getStoreId().equals(storeId))
+                        .toList();
+
+                assertThat(createdOrders).hasSize(requestCount);
+                assertThat(createdOrders)
+                        .extracting(Order::getOrderNumber)
+                        .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, requestCount).boxed().toList());
+                assertThat(persistedOrders).hasSize(requestCount);
+                assertThat(persistedOrders)
+                        .extracting(Order::getOrderNumber)
+                        .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, requestCount).boxed().toList());
+            } finally {
+                executorService.shutdown();
+            }
+        }
+
+        @Test
         @DisplayName("주문 항목이 비어 있으면 BAD_REQUEST 예외를 발생시킨다")
         void throwsWhenItemsEmpty() {
             OrderCreateCommand command = new OrderCreateCommand(storeId, List.of());
@@ -279,5 +322,14 @@ class OrderFacadeIntegrationTest {
 
     private Order createOrderWith(OrderItemLine... lines) {
         return orderFacade.createOrder(new OrderCreateCommand(storeId, List.of(lines)));
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
     }
 }
