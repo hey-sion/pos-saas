@@ -179,7 +179,7 @@ function showVerifyResult(verified, orderNumber, pgOk = true) {
             renderOrderBanner();
         }
         showToast(
-            orderNumber ? `주문이 접수되었어요.\n주문번호 ${orderNumber}번으로 확인해주세요.` : "결제가 완료됐어요",
+            orderNumber ? `결제가 완료됐어요\n주문번호 #${orderNumber}번` : "결제가 완료됐어요",
             {replayOnResume: true}
         );
         resetCart();
