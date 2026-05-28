@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("submitOrderButton").addEventListener("click", submitOrder);
     loadMenus();
     renderCart();
+    handlePaymentReturn();
 });
 
 async function loadMenus() {
@@ -127,22 +128,31 @@ async function submitOrder() {
     try {
         const order = await createOrder();
         const created = await createPayment(order.id);
-        await requestPortOne(created.pg);
-        const verified = await verifyPayment(created.payment.id);
 
-        if (verified.status === "COMPLETED") {
-            showToast(`주문번호 ${order.orderNumber}번의 결제가 완료됐어요`);
-            resetCart();
-        } else if (verified.status === "FAILED") {
-            showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
-        } else {
-            showToast("결제 확인 중이에요. 잠시 후 다시 시도해주세요");
-        }
+        // 모바일(카카오페이 REDIRECTION)은 여기서 카카오로 이탈했다가 redirectUrl로 복귀 → 복귀 시 handlePaymentReturn에서 verify.
+        // PC(IFRAME)는 인라인 복귀라 아래 verify가 이어서 실행된다.
+        const redirectUrl = `${location.origin}/order/${storeId}?verifyPaymentId=${created.payment.id}&orderNumber=${order.orderNumber}`;
+        await requestPortOne(created.pg, redirectUrl);
+
+        const verified = await verifyPayment(created.payment.id);
+        showVerifyResult(verified, order.orderNumber);
     } catch {
         showToast("결제 확인 중이에요. 잠시 후 화면을 새로고침해주세요");
     } finally {
         state.submitting = false;
         renderCart();
+    }
+}
+
+// 모바일 리다이렉트 복귀와 PC 인라인 결제가 공유하는 결과 처리.
+function showVerifyResult(verified, orderNumber) {
+    if (verified.status === "COMPLETED") {
+        showToast(orderNumber ? `주문번호 ${orderNumber}번의 결제가 완료됐어요` : "결제가 완료됐어요");
+        resetCart();
+    } else if (verified.status === "FAILED") {
+        showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
+    } else {
+        showToast("결제 확인 중이에요. 잠시 후 다시 시도해주세요");
     }
 }
 
@@ -175,7 +185,7 @@ async function createPayment(orderId) {
     return response.json();
 }
 
-async function requestPortOne(pg) {
+async function requestPortOne(pg, redirectUrl) {
     if (typeof PortOne === "undefined" || !PortOne.requestPayment) {
         return;
     }
@@ -194,7 +204,10 @@ async function requestPortOne(pg) {
             totalAmount: pg.totalAmount,
             currency: pg.currency,
             payMethod: pg.payMethod,
-            easyPay: pg.easyPay
+            easyPay: pg.easyPay,
+            // 카카오페이: PC=IFRAME(인라인 복귀), 모바일=REDIRECTION(카카오 앱/페이지로 이동 후 redirectUrl로 복귀). 그 외 모드는 에러.
+            windowType: {pc: "IFRAME", mobile: "REDIRECTION"},
+            redirectUrl
         });
     } catch {
         // SDK 예외는 단정하지 않고 후속 verify(백엔드 단건 조회)로 권위있는 상태를 확인한다.
@@ -211,6 +224,26 @@ async function verifyPayment(paymentId) {
     }
 
     return response.json();
+}
+
+// 모바일 카카오페이는 REDIRECTION이라 결제 후 redirectUrl(?verifyPaymentId=…)로 복귀한다.
+// 그 시점에 우리 결제 ID로 서버 verify(PortOne 재조회 = 권위있는 상태)를 호출해 결과를 보여준다.
+async function handlePaymentReturn() {
+    const params = new URLSearchParams(location.search);
+    const verifyPaymentId = params.get("verifyPaymentId");
+    if (!verifyPaymentId) {
+        return;
+    }
+
+    const orderNumber = params.get("orderNumber");
+    history.replaceState(null, "", location.pathname); // 새로고침 시 재검증 방지
+
+    try {
+        const verified = await verifyPayment(verifyPaymentId);
+        showVerifyResult(verified, orderNumber);
+    } catch {
+        showToast("결제 확인 중이에요. 잠시 후 화면을 새로고침해주세요");
+    }
 }
 
 function resetCart() {
