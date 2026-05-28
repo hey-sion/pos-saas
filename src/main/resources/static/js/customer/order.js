@@ -13,6 +13,9 @@ const state = {
 // 결제 완료 후 상단 배너에서 주문번호 30분간 확인 가능
 const ORDER_BANNER_TTL_MS = 30 * 60 * 1000;
 const LAST_ORDER_KEY = "pos:lastOrder";
+const PENDING_TOAST_KEY = "pos:pendingToast";
+const PENDING_TOAST_TTL_MS = 2 * 60 * 1000;
+const TOAST_DURATION_MS = 3000;
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("submitOrderButton").addEventListener("click", submitOrder);
@@ -20,6 +23,14 @@ document.addEventListener("DOMContentLoaded", () => {
     loadMenus();
     renderCart();
     handlePaymentReturn();
+});
+
+window.addEventListener("pageshow", () => showPendingToast());
+window.addEventListener("focus", () => showPendingToast());
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+        showPendingToast();
+    }
 });
 
 async function loadMenus() {
@@ -167,7 +178,10 @@ function showVerifyResult(verified, orderNumber, pgOk = true) {
             saveLastOrder(orderNumber);
             renderOrderBanner();
         }
-        showToast(orderNumber ? `주문이 접수되었어요.\n주문번호 ${orderNumber}번으로 확인해주세요.` : "결제가 완료됐어요");
+        showToast(
+            orderNumber ? `주문이 접수되었어요.\n주문번호 ${orderNumber}번으로 확인해주세요.` : "결제가 완료됐어요",
+            {replayOnResume: true}
+        );
         resetCart();
     } else if (verified.status === "FAILED") {
         showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
@@ -240,7 +254,7 @@ async function requestPortOne(pg, redirectUrl) {
         // false 반환은 PENDING/verify 실패 시 메시지 분기용 힌트일 뿐, verify의 COMPLETED/FAILED 판정은 그대로 우선.
         return false;
     } finally {
-        childrenBefore.forEach(el => el.style.visibility = "");
+        restorePageVisibility();
     }
 }
 
@@ -274,6 +288,10 @@ async function handlePaymentReturn() {
     }
 }
 
+function restorePageVisibility() {
+    Array.from(document.body.children).forEach(el => el.style.visibility = "");
+}
+
 // 최근 주문을 localStorage에 저장 — 페이지 새로고침/재진입 시에도 자기 주문번호 확인 가능.
 // 매장 분리: storeId까지 같이 저장해서 다른 매장 QR로 진입 시 보이지 않게.
 function saveLastOrder(orderNumber) {
@@ -285,6 +303,48 @@ function saveLastOrder(orderNumber) {
         }));
     } catch {
         // localStorage 접근 불가(시크릿 모드/용량초과 등) — 배너 미동작 허용.
+    }
+}
+
+function savePendingToast(message) {
+    try {
+        sessionStorage.setItem(PENDING_TOAST_KEY, JSON.stringify({
+            storeId,
+            message,
+            ts: Date.now()
+        }));
+    } catch {
+        // sessionStorage 접근 불가 시 현재 화면 토스트만 사용
+    }
+}
+
+function readPendingToast() {
+    try {
+        const raw = sessionStorage.getItem(PENDING_TOAST_KEY);
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.storeId !== storeId || !parsed.message) {
+            sessionStorage.removeItem(PENDING_TOAST_KEY);
+            return null;
+        }
+        if (Date.now() - parsed.ts > PENDING_TOAST_TTL_MS) {
+            sessionStorage.removeItem(PENDING_TOAST_KEY);
+            return null;
+        }
+        return parsed;
+    } catch {
+        return null;
+    }
+}
+
+function clearPendingToast() {
+    try {
+        sessionStorage.removeItem(PENDING_TOAST_KEY);
+    } catch {
+        // sessionStorage 접근 불가 허용
     }
 }
 
@@ -329,12 +389,48 @@ function formatPrice(amount) {
     return `${Number(amount).toLocaleString("ko-KR")}원`;
 }
 
-function showToast(message) {
+function showPendingToast() {
+    restorePageVisibility();
+
+    if (document.visibilityState !== "visible") {
+        return;
+    }
+
+    const pending = readPendingToast();
+    if (!pending) {
+        return;
+    }
+
+    clearPendingToast();
+    displayToast(pending.message);
+}
+
+function showToast(message, options = {}) {
+    if (options.replayOnResume || document.visibilityState !== "visible") {
+        savePendingToast(message);
+    }
+
+    if (document.visibilityState !== "visible") {
+        return;
+    }
+
+    displayToast(message);
+
+    if (options.replayOnResume) {
+        setTimeout(() => {
+            if (document.visibilityState === "visible" && document.hasFocus()) {
+                clearPendingToast();
+            }
+        }, TOAST_DURATION_MS + 100);
+    }
+}
+
+function displayToast(message) {
     const toast = document.getElementById("toast");
 
     toast.textContent = message;
     toast.classList.remove("show");
     void toast.offsetWidth;
     toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 3000);
+    setTimeout(() => toast.classList.remove("show"), TOAST_DURATION_MS);
 }
