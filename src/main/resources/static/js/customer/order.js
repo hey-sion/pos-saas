@@ -15,7 +15,7 @@ const ORDER_BANNER_TTL_MS = 30 * 60 * 1000;
 const LAST_ORDER_KEY = "pos:lastOrder";
 const PENDING_TOAST_KEY = "pos:pendingToast";
 const PENDING_TOAST_TTL_MS = 2 * 60 * 1000;
-const TOAST_DURATION_MS = 3000;
+const TOAST_DURATION_MS = 4000;
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("submitOrderButton").addEventListener("click", submitOrder);
