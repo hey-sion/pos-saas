@@ -1,6 +1,7 @@
 package com.sion.pos.domain.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sion.pos.support.error.ErrorType;
@@ -217,6 +218,43 @@ class OrderTest {
             expects(ErrorType.BAD_REQUEST, () -> order.changeTotalAmount(null));
             expects(ErrorType.BAD_REQUEST, () -> order.changeTotalAmount(0));
             expects(ErrorType.BAD_REQUEST, () -> order.changeTotalAmount(-1));
+        }
+    }
+
+    @Nested
+    @DisplayName("결제 가능 여부 확인 시, ")
+    class EnsurePayable {
+
+        @Test
+        @DisplayName("PAYMENT_PENDING 상태면 예외를 던지지 않는다")
+        void doesNotThrowWhenPaymentPending() {
+            Order order = Order.create(STORE_ID, ORDER_DATE, ORDER_NUMBER, TOTAL_AMOUNT);
+
+            assertThatCode(order::ensurePayable).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("RECEIVED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenReceived() {
+            Order order = receivedOrder();
+
+            expects(ErrorType.CONFLICT, order::ensurePayable);
+        }
+
+        @Test
+        @DisplayName("DELIVERED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenDelivered() {
+            Order order = deliveredOrder();
+
+            expects(ErrorType.CONFLICT, order::ensurePayable);
+        }
+
+        @Test
+        @DisplayName("CANCELLED 상태면 CONFLICT 예외를 던진다")
+        void throwsWhenCancelled() {
+            Order order = cancelledOrder();
+
+            expects(ErrorType.CONFLICT, order::ensurePayable);
         }
     }
 

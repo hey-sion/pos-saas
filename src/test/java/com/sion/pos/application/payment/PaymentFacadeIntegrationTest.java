@@ -417,6 +417,73 @@ class PaymentFacadeIntegrationTest {
         }
     }
 
+    @Nested
+    @DisplayName("손님 결제 생성 시, ")
+    class CreateCustomerPayment {
+
+        @Test
+        @DisplayName("주문 ID만으로 카카오페이 PG 결제를 PENDING으로 생성하고 PG 파라미터를 반환한다")
+        void createsPendingPgPaymentFromOrderIdOnly() {
+            Order order = createOrderWith(americanoId, 1);
+
+            PaymentCreateInfo info = paymentFacade.createCustomerPayment(order.getId());
+
+            Order persistedOrder = orderRepository.findById(order.getId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(info.status()).isEqualTo(Payment.Status.PENDING),
+                    () -> assertThat(info.method()).isEqualTo(Payment.Method.EASY_PAY),
+                    () -> assertThat(info.amount()).isEqualTo(AMERICANO_PRICE),
+                    () -> assertThat(info.pg()).isNotNull(),
+                    () -> assertThat(persistedOrder.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING)
+            );
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 주문이면 NOT_FOUND 예외를 발생시킨다")
+        void throwsNotFoundWhenOrderNotExists() {
+            expects(ErrorType.NOT_FOUND, () -> paymentFacade.createCustomerPayment(Long.MAX_VALUE));
+        }
+
+        @Test
+        @DisplayName("이미 결제 완료된 주문이면 CONFLICT 예외를 발생시킨다")
+        void throwsConflictWhenAlreadyCompleted() {
+            Order order = createOrderWith(americanoId, 1);
+            paymentFacade.createPayment(storeId,
+                    new PaymentCreateCommand(order.getId(), Payment.Method.CASH, null));
+
+            expects(ErrorType.CONFLICT, () -> paymentFacade.createCustomerPayment(order.getId()));
+        }
+    }
+
+    @Nested
+    @DisplayName("손님 결제 검증 시, ")
+    class VerifyCustomerPayment {
+
+        @Test
+        @DisplayName("PG가 PAID를 응답하면 COMPLETED로 변경하고 주문을 RECEIVED로 승격한다")
+        void completesAndPromotesOrderWhenPaid() {
+            PaymentCreateInfo created = createCustomerPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-customer", null));
+
+            PaymentVerifyInfo info = paymentFacade.verifyCustomerPayment(created.paymentId());
+
+            Order order = orderRepository.findById(created.orderId()).orElseThrow();
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(info.status()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.COMPLETED),
+                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.RECEIVED)
+            );
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 결제이면 NOT_FOUND 예외를 발생시킨다")
+        void throwsNotFoundWhenPaymentNotExists() {
+            expects(ErrorType.NOT_FOUND, () -> paymentFacade.verifyCustomerPayment(Long.MAX_VALUE));
+        }
+    }
+
     private Order createOrderWith(Long menuId, int quantity) {
         return orderFacade.createOrder(new OrderCreateCommand(
                 storeId,
@@ -429,6 +496,11 @@ class PaymentFacadeIntegrationTest {
                 order.getId(),
                 Payment.Method.EASY_PAY,
                 Payment.Provider.KAKAO_PAY));
+    }
+
+    private PaymentCreateInfo createCustomerPgPayment() {
+        Order order = createOrderWith(americanoId, 1);
+        return paymentFacade.createCustomerPayment(order.getId());
     }
 
     private Order createOtherStoreOrder() {

@@ -41,10 +41,22 @@ public class PaymentFacade {
     @Transactional
     public PaymentCreateInfo createPayment(Long storeId, PaymentCreateCommand command) {
         Order order = orderService.getOrder(storeId, command.orderId());
-        if (order.getStatus() != Order.Status.PAYMENT_PENDING) {
-            throw new PosApplicationException(ErrorType.CONFLICT,
-                    "결제할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
-        }
+        return createPaymentForOrder(order, command);
+    }
+
+    /**
+     * 손님 셀프결제용 결제 생성.
+     */
+    @Transactional
+    public PaymentCreateInfo createCustomerPayment(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                                     .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
+        return createPaymentForOrder(order,
+                new PaymentCreateCommand(orderId, Payment.Method.EASY_PAY, Payment.Provider.KAKAO_PAY));
+    }
+
+    private PaymentCreateInfo createPaymentForOrder(Order order, PaymentCreateCommand command) {
+        order.ensurePayable();
 
         List<Payment> payments = paymentRepository.findByOrderIdIn(List.of(order.getId()));
         boolean alreadyCompleted = payments.stream()
@@ -80,8 +92,20 @@ public class PaymentFacade {
 
     @Transactional
     public PaymentVerifyInfo verify(Long storeId, Long paymentId) {
-        Payment payment = getPayment(storeId, paymentId);
+        return verifyPayment(getPayment(storeId, paymentId));
+    }
 
+    /**
+     * 손님 셀프결제용 결제 검증. 세션이 없어 storeId 스코프 없이 paymentId로 조회한다(공개 진입점).
+     */
+    @Transactional
+    public PaymentVerifyInfo verifyCustomerPayment(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                                           .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다."));
+        return verifyPayment(payment);
+    }
+
+    private PaymentVerifyInfo verifyPayment(Payment payment) {
         if (!payment.isPgChannel()) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "PG 결제만 검증할 수 있습니다.");
         }

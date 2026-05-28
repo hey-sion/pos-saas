@@ -98,6 +98,12 @@ public class Order extends BaseEntity {
         this.totalAmount = totalAmount;
     }
 
+    public void ensurePayable() {
+        if (this.status != Status.PAYMENT_PENDING) {
+            throw new PosApplicationException(ErrorType.CONFLICT, "결제할 수 없는 주문 상태입니다. 현재 상태: " + this.status);
+        }
+    }
+
     public enum Status {
         PAYMENT_PENDING,
         RECEIVED,
