@@ -110,6 +110,21 @@ public class OrderService {
         return new DailyOrderSummaryInfo(date, salesAmount, salesOrderCount, orders.size(), orderInfos);
     }
 
+    @Transactional(readOnly = true)
+    public String summarizeItems(Long orderId) {
+        List<OrderItem> items = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(orderId));
+        if (items.isEmpty()) {
+            return "주문";
+        }
+
+        String first = items.get(0).getMenuName();
+        if (items.size() == 1) {
+            return first;
+        }
+
+        return first + " 외 " + (items.size() - 1) + "건";
+    }
+
     private WaitingOrderInfo toWaitingOrderInfo(Order order, List<OrderItem> items, Payment payment) {
         return new WaitingOrderInfo(
                 order.getId(),

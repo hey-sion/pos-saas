@@ -2,8 +2,6 @@ package com.sion.pos.application.payment;
 
 import com.sion.pos.application.order.OrderService;
 import com.sion.pos.domain.order.Order;
-import com.sion.pos.domain.order.OrderItem;
-import com.sion.pos.domain.order.OrderItemRepository;
 import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.domain.payment.PaymentGateway;
@@ -32,7 +30,6 @@ public class PaymentFacade {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final OrderService orderService;
-    private final OrderItemRepository orderItemRepository;
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
@@ -77,7 +74,7 @@ public class PaymentFacade {
                     payment,
                     portOneProperties.storeId(),
                     portOneProperties.channelKeyOf(command.provider()),
-                    buildOrderName(order.getId())
+                    orderService.summarizeItems(order.getId())
             );
         }
 
@@ -185,20 +182,6 @@ public class PaymentFacade {
                 .filter(payment -> payment.getChannel() == Payment.Channel.PG)
                 .filter(payment -> payment.getStatus() == Payment.Status.PENDING)
                 .forEach(payment -> payment.fail("새 결제 요청으로 기존 결제 요청 무효화"));
-    }
-
-    private String buildOrderName(Long orderId) {
-        List<OrderItem> items = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(orderId));
-        if (items.isEmpty()) {
-            return "주문";
-        }
-
-        String first = items.get(0).getMenuName();
-        if (items.size() == 1) {
-            return first;
-        }
-
-        return first + " 외 " + (items.size() - 1) + "건";
     }
 
     private Payment getPayment(Long storeId, Long paymentId) {
