@@ -114,8 +114,8 @@ function createCartChip(item) {
     return chip;
 }
 
-// 주문 생성 + 결제를 한 단위로 묶은 진입점. 지금은 버튼이 직접 호출하지만,
-// 추후 "주문 확인하기" 모달을 거치도록 바뀌어도 트리거만 교체하고 이 함수는 그대로 재사용한다.
+// 주문 생성 + 결제를 한 단위로 묶은 진입점. 카카오페이 단일이라 수단 선택 모달 없이 바로 결제까지 진행한다.
+// 통신 오류는 결제 실패로 단정하지 않는다(이중청구 오인 방지) — 확인 중 + 새로고침 안내로.
 async function submitOrder() {
     if (state.cart.size === 0 || state.submitting) {
         return;
@@ -126,11 +126,20 @@ async function submitOrder() {
 
     try {
         const order = await createOrder();
-        // TODO(Phase 5): 여기서 포트원 통합결제 창을 띄워 결제까지 진행한다. 지금은 stub.
-        showToast(`주문번호 ${order.orderNumber}번이 접수됐어요. 결제 기능은 준비 중입니다`);
-        resetCart();
+        const created = await createPayment(order.id);
+        await requestPortOne(created.pg);
+        const verified = await verifyPayment(created.payment.id);
+
+        if (verified.status === "COMPLETED") {
+            showToast(`주문번호 ${order.orderNumber}번의 결제가 완료됐어요`);
+            resetCart();
+        } else if (verified.status === "FAILED") {
+            showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
+        } else {
+            showToast("결제 확인 중이에요. 잠시 후 다시 시도해주세요");
+        }
     } catch {
-        showToast("주문 처리에 실패했습니다. 잠시 후 다시 시도해주세요");
+        showToast("결제 확인 중이에요. 잠시 후 화면을 새로고침해주세요");
     } finally {
         state.submitting = false;
         renderCart();
@@ -150,6 +159,55 @@ async function createOrder() {
 
     if (response.status !== 201) {
         throw new Error("Failed to create order");
+    }
+
+    return response.json();
+}
+
+// 손님 셀프결제는 카카오페이로 고정 — 결제 수단/금액/storeId를 클라가 보내지 않고 서버가 order에서 파생한다.
+async function createPayment(orderId) {
+    const response = await fetch(`/api/v1/customer/orders/${orderId}/payments`, {method: "POST"});
+
+    if (response.status !== 201) {
+        throw new Error("Failed to create payment");
+    }
+
+    return response.json();
+}
+
+async function requestPortOne(pg) {
+    if (typeof PortOne === "undefined" || !PortOne.requestPayment) {
+        return;
+    }
+
+    // 결제창 호출 시점의 body 자식만 hide(PortOne wrapper는 호출 후 추가되어 영향 없음).
+    // 부모 페이지 paint cost를 줄여 카카오페이 결제창 응답성 개선.
+    const childrenBefore = Array.from(document.body.children);
+    childrenBefore.forEach(el => el.style.visibility = "hidden");
+
+    try {
+        await PortOne.requestPayment({
+            storeId: pg.storeId,
+            channelKey: pg.channelKey,
+            paymentId: pg.paymentId,
+            orderName: pg.orderName,
+            totalAmount: pg.totalAmount,
+            currency: pg.currency,
+            payMethod: pg.payMethod,
+            easyPay: pg.easyPay
+        });
+    } catch {
+        // SDK 예외는 단정하지 않고 후속 verify(백엔드 단건 조회)로 권위있는 상태를 확인한다.
+    } finally {
+        childrenBefore.forEach(el => el.style.visibility = "");
+    }
+}
+
+async function verifyPayment(paymentId) {
+    const response = await fetch(`/api/v1/customer/payments/${paymentId}/verify`, {method: "POST"});
+
+    if (!response.ok) {
+        throw new Error("Failed to verify payment");
     }
 
     return response.json();
