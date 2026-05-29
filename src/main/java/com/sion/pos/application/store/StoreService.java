@@ -18,4 +18,10 @@ public class StoreService {
         return storeRepository.findById(storeId)
                               .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "존재하지 않는 매장입니다."));
     }
+
+    @Transactional(readOnly = true)
+    public Store getStoreBySlug(String slug) {
+        return storeRepository.findBySlug(slug)
+                              .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "존재하지 않는 매장입니다."));
+    }
 }

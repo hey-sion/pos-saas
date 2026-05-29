@@ -17,10 +17,10 @@ public class CustomerPageController {
 
     private final StoreService storeService;
 
-    @GetMapping("/order/{storeId}")
-    public String order(@PathVariable Long storeId, Model model) {
-        Store store = storeService.getStore(storeId);
-        model.addAttribute("storeId", storeId);
+    @GetMapping("/order/{slug}")
+    public String order(@PathVariable String slug, Model model) {
+        Store store = storeService.getStoreBySlug(slug);
+        model.addAttribute("storeId", store.getId());
         model.addAttribute("storeName", store.getName());
         return "customer/order";
     }

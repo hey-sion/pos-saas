@@ -22,6 +22,9 @@ public class Store extends BaseEntity {
     @Column(length = 30)
     private String phone;
 
+    @Column(length = 30, unique = true)
+    private String slug;
+
     public static Store create(String name, String phone) {
         if (name == null || name.isBlank()) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "name은 필수입니다.");
@@ -32,5 +35,17 @@ public class Store extends BaseEntity {
         store.phone = phone;
 
         return store;
+    }
+
+    public void enableQrOrder(String slug) {
+        if (slug == null || slug.isBlank()) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "고객 주문 페이지 생성시 slug는 필수입니다.");
+        }
+
+        this.slug = slug;
+    }
+
+    public boolean isQrOrderEnabled() {
+        return slug != null;
     }
 }
