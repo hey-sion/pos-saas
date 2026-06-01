@@ -153,7 +153,8 @@ async function submitOrder() {
 
         // 모바일(카카오페이 REDIRECTION)은 여기서 카카오로 이탈했다가 redirectUrl로 복귀 → 복귀 시 handlePaymentReturn에서 verify.
         // PC(IFRAME)는 인라인 복귀라 아래 verify가 이어서 실행된다.
-        const redirectUrl = `${location.origin}/order/${storeId}?verifyPaymentId=${created.payment.id}&orderNumber=${order.orderNumber}`;
+        // 복귀 경로는 현재 slug 기반 페이지 경로(location.pathname = /order/{slug})를 그대로 재사용한다.
+        const redirectUrl = `${location.origin}${location.pathname}?verifyPaymentId=${created.payment.id}&orderNumber=${order.orderNumber}`;
         const pgOk = await requestPortOne(created.pg, redirectUrl);
 
         try {
