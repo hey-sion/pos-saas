@@ -135,11 +135,35 @@
             color: var(--gray-500);
             margin-top: 4px;
         }
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
         .section-label {
             font-size: 13px;
             font-weight: 700;
             color: var(--gray-600);
-            margin-bottom: 10px;
+        }
+        .sort-toggle {
+            height: 42px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 0 16px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: var(--white);
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-600);
+            cursor: pointer;
+        }
+        .sort-toggle:hover {
+            background: var(--gray-100);
+            color: var(--gray-800);
         }
         .order-history {
             display: flex;
@@ -239,7 +263,10 @@
                 <div class="daily-amount" id="dailyTotal">0원</div>
                 <div class="daily-count" id="dailyCount">매출 인정 0건 / 전체 주문 0건</div>
             </div>
-            <div class="section-label">주문 내역</div>
+            <div class="section-head">
+                <div class="section-label">주문 내역</div>
+                <button type="button" class="sort-toggle" id="sortToggle"></button>
+            </div>
             <div class="order-history" id="orderHistory">
                 <div class="history-empty">아직 주문 내역이 없습니다</div>
             </div>
