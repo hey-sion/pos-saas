@@ -15,4 +15,9 @@ public class PosPageController {
     public String manage() {
         return "pos/manage";
     }
+
+    @GetMapping("/manage/supply")
+    public String supply() {
+        return "pos/supply";
+    }
 }

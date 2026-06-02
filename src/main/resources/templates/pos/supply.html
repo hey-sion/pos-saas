@@ -1,0 +1,473 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>재료 관리</title>
+    <link rel="stylesheet" href="/css/pos/header.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f5f6f8;
+            --white: #ffffff;
+            --gray-50: #f9fafb;
+            --gray-100: #f2f4f6;
+            --gray-200: #e5e8eb;
+            --gray-400: #b0b8c1;
+            --gray-500: #8b95a1;
+            --gray-600: #6b7684;
+            --gray-800: #333d4b;
+            --gray-900: #191f28;
+            --blue-50: #e8f3ff;
+            --blue-500: #3182f6;
+            --blue-600: #2272eb;
+            --green-50: #e8faf5;
+            --green-600: #1aab6e;
+            --orange-50: #fff4e6;
+            --orange-600: #e8830c;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.2);
+            --font: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--gray-900);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .manage-layout {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            min-height: calc(100vh - 56px);
+        }
+        .manage-sidebar {
+            background: var(--white);
+            border-right: 1px solid var(--gray-200);
+            padding: 20px 16px;
+        }
+        .manage-nav {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            min-height: 40px;
+            margin-bottom: 4px;
+            padding: 0 10px;
+            border-radius: var(--radius-sm);
+            color: var(--gray-600);
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .manage-nav:hover {
+            background: var(--gray-100);
+            color: var(--gray-800);
+        }
+        .manage-nav.active {
+            background: var(--blue-50);
+            color: var(--blue-500);
+        }
+        .manage-panel {
+            padding: 24px;
+            overflow-y: auto;
+        }
+        .manage-content {
+            max-width: 1040px;
+        }
+        .manage-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 20px;
+        }
+        .section-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .section-label {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--gray-600);
+        }
+        .section-sub {
+            font-size: 13px;
+            color: var(--gray-400);
+        }
+
+        .supply-form {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md);
+            padding: 8px 18px;
+            margin-bottom: 28px;
+            box-shadow: var(--shadow-sm);
+        }
+        .item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .item-name {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+        .qty-field {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+        .qty-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .qty-input {
+            width: 120px;
+            height: 48px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: var(--white);
+            padding: 0 14px;
+            font: inherit;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: right;
+            color: var(--gray-900);
+        }
+        .qty-input:focus {
+            outline: none;
+            border-color: var(--blue-500);
+        }
+        .step-btn {
+            width: 44px;
+            height: 44px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            background: var(--white);
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .step-btn:hover {
+            background: var(--gray-100);
+            color: var(--gray-900);
+        }
+        .step-btn:disabled {
+            color: var(--gray-200);
+            cursor: default;
+            background: var(--white);
+        }
+        .stepper-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 120px;
+            height: 48px;
+        }
+        .step-value {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+        .qty-suffix {
+            width: 40px;
+            text-align: left;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-600);
+        }
+        .qty-sub {
+            padding-right: 50px;
+            font-size: 14px;
+            color: var(--gray-500);
+            font-weight: 600;
+            min-height: 18px;
+        }
+        .qty-sub .amount {
+            color: var(--gray-800);
+            font-weight: 700;
+        }
+        .form-actions {
+            padding: 18px 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .form-total {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-600);
+        }
+        .form-total .amount {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-left: 8px;
+        }
+        .submit-btn {
+            height: 48px;
+            padding: 0 28px;
+            border: 0;
+            border-radius: var(--radius-sm);
+            background: var(--blue-500);
+            color: var(--white);
+            font: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .submit-btn:hover {
+            background: var(--blue-600);
+        }
+        .submit-btn:disabled {
+            background: var(--gray-200);
+            color: var(--gray-400);
+            cursor: default;
+        }
+
+        .order-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .order-empty {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--gray-400);
+            text-align: center;
+            padding: 44px 0;
+        }
+        .order-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+        }
+        .order-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .order-when {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+        .order-body {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .order-items {
+            font-size: 16px;
+            color: var(--gray-800);
+            line-height: 1.7;
+        }
+        .order-amount {
+            font-size: 17px;
+            font-weight: 800;
+            color: var(--gray-900);
+            white-space: nowrap;
+        }
+        .order-status {
+            font-size: 13px;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 99px;
+            white-space: nowrap;
+        }
+        .order-status.requested { background: var(--gray-100); color: var(--gray-600); }
+        .order-status.confirmed { background: var(--orange-50); color: var(--orange-600); }
+        .order-status.deposited { background: var(--blue-50); color: var(--blue-500); }
+        .order-status.shipped { background: var(--green-50); color: var(--green-600); }
+        .more-btn {
+            align-self: center;
+            margin-top: 4px;
+            padding: 10px 18px;
+            border: 0;
+            background: transparent;
+            color: var(--gray-600);
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .more-btn:hover {
+            color: var(--gray-900);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 100;
+        }
+        .modal-overlay.open {
+            display: flex;
+        }
+        .modal {
+            width: 100%;
+            max-width: 560px;
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            padding: 36px 40px;
+        }
+        .modal-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 28px;
+        }
+        .modal-list {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+        .modal-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            font-size: 18px;
+        }
+        .modal-row .name {
+            color: var(--gray-800);
+            font-weight: 700;
+        }
+        .modal-row .detail {
+            color: var(--gray-500);
+            font-size: 14px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .modal-row .price {
+            color: var(--gray-900);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .modal-total {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            padding-top: 20px;
+            margin-bottom: 28px;
+            border-top: 2px solid var(--gray-100);
+        }
+        .modal-total .label {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--gray-600);
+        }
+        .modal-total .amount {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .btn-cancel, .btn-confirm {
+            flex: 1;
+            height: 56px;
+            border: 0;
+            border-radius: var(--radius-sm);
+            font: inherit;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-cancel {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+        .btn-cancel:hover {
+            background: var(--gray-200);
+        }
+        .btn-confirm {
+            background: var(--blue-500);
+            color: var(--white);
+        }
+        .btn-confirm:hover {
+            background: var(--blue-600);
+        }
+
+        @media (max-width: 760px) {
+            .manage-layout { grid-template-columns: 1fr; }
+            .manage-sidebar {
+                border-right: 0;
+                border-bottom: 1px solid var(--gray-200);
+            }
+            .modal { padding: 28px 24px; }
+        }
+    </style>
+</head>
+<body>
+<header th:replace="~{fragments/header :: posHeader('manage')}"></header>
+
+<main class="manage-layout">
+    <aside class="manage-sidebar">
+        <a class="manage-nav" href="/manage">판매 관리</a>
+        <a class="manage-nav active" href="/manage/supply">재료 관리</a>
+    </aside>
+
+    <section class="manage-panel">
+        <div class="manage-content">
+            <div class="section-head">
+                <span class="section-label">재료 주문</span>
+            </div>
+            <div class="supply-form" id="supplyForm"></div>
+
+            <div class="section-head">
+                <span class="section-label">내 발주 현황</span>
+                <span class="section-sub" id="orderSub"></span>
+            </div>
+            <div class="order-list" id="orderList"></div>
+        </div>
+    </section>
+</main>
+
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+        <div class="modal-title">발주 확인</div>
+        <div class="modal-list" id="modalList"></div>
+        <div class="modal-total">
+            <span class="label">합계</span>
+            <span class="amount" id="modalTotal">0원</span>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-cancel" id="modalCancel">취소</button>
+            <button type="button" class="btn-confirm" id="modalConfirm">발주하기</button>
+        </div>
+    </div>
+</div>
+
+<script src="/js/pos/supply.js"></script>
+</body>
+</html>
