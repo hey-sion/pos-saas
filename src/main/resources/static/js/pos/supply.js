@@ -1,8 +1,3 @@
-const SUPPLY_ITEMS = [
-    {code: "DOUGH_MIX", name: "반죽믹스", unit: "포", perPack: 1, unitPrice: 35000, min: 0, defaultQty: 1, max: 9999, control: "input"},
-    {code: "PLASTIC_BAG", name: "비닐봉투", unit: "묶음", perPack: 6000, packUnit: "매", unitPrice: 152000, min: 0, defaultQty: 1, max: 999, control: "stepper"}
-];
-
 const STATUS_LABELS = {
     REQUESTED: "주문확인중",
     CONFIRMED: "입금대기중",
@@ -12,6 +7,14 @@ const STATUS_LABELS = {
 
 const VISIBLE_ORDERS = 5;
 
+// 서버 카탈로그엔 없는 화면 동작 정책(품목별 입력 방식). itemCode로 매핑한다.
+const ITEM_UI = {
+    DOUGH_MIX: {control: "input", min: 0, defaultQty: 1, max: 9999},
+    PLASTIC_BAG: {control: "stepper", min: 0, defaultQty: 1, max: 999}
+};
+const DEFAULT_UI = {control: "input", min: 0, defaultQty: 1, max: 9999};
+
+let supplyItems = [];
 const quantities = {};
 let orders = [];
 let ordersExpanded = false;
@@ -19,17 +22,33 @@ let ordersExpanded = false;
 const formatNumber = (value) => new Intl.NumberFormat("ko-KR").format(value);
 const formatPrice = (value) => `${formatNumber(value)}원`;
 
-function amountOf(item) {
-    return quantities[item.code] * item.unitPrice;
+function getCookie(name) {
+    return document.cookie
+        .split("; ")
+        .find((row) => row.startsWith(`${name}=`))
+        ?.split("=")[1];
 }
 
-function itemDisplay(item) {
-    const quantity = quantities[item.code];
+function jsonHeaders() {
+    const csrfToken = getCookie("XSRF-TOKEN");
+    const headers = {"Content-Type": "application/json"};
 
-    if (item.perPack === 1) {
-        return `${formatNumber(quantity)}${item.unit}`;
+    if (csrfToken) {
+        headers["X-XSRF-TOKEN"] = decodeURIComponent(csrfToken);
     }
-    return `${formatNumber(quantity * item.perPack)}${item.packUnit} (${formatNumber(quantity)}${item.unit})`;
+
+    return headers;
+}
+
+function makeDisplay(perPack, packUnit, unit, quantity) {
+    if (perPack > 1) {
+        return `${formatNumber(quantity * perPack)}${packUnit} (${formatNumber(quantity)}${unit})`;
+    }
+    return `${formatNumber(quantity)}${unit}`;
+}
+
+function amountOf(item) {
+    return quantities[item.code] * item.unitPrice;
 }
 
 function formatWhen(isoString) {
@@ -60,10 +79,65 @@ async function loadStore() {
     }
 }
 
+async function loadCatalog() {
+    try {
+        const response = await fetch("/api/v1/supply-items");
+
+        if (!response.ok) {
+            supplyItems = [];
+            return;
+        }
+
+        const items = await response.json();
+        supplyItems = items.map((catalog) => ({
+            code: catalog.code,
+            name: catalog.name,
+            unit: catalog.unit,
+            unitPrice: catalog.unitPrice,
+            perPack: catalog.packSize ?? 1,
+            packUnit: catalog.packUnit,
+            ...(ITEM_UI[catalog.code] ?? DEFAULT_UI)
+        }));
+    } catch {
+        supplyItems = [];
+    }
+}
+
+async function loadOrders() {
+    try {
+        const response = await fetch("/api/v1/supply-orders");
+
+        if (!response.ok) {
+            orders = [];
+            return;
+        }
+
+        orders = (await response.json()).map(toOrderView);
+    } catch {
+        orders = [];
+    }
+}
+
+function toOrderView(order) {
+    return {
+        createdAt: order.createdAt,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        items: order.items.map((item) => {
+            const catalog = supplyItems.find((c) => c.code === item.itemCode);
+            const perPack = catalog?.perPack ?? 1;
+            return {
+                itemName: item.itemName,
+                display: makeDisplay(perPack, catalog?.packUnit, item.unit, item.quantity)
+            };
+        })
+    };
+}
+
 function renderForm() {
     const form = document.getElementById("supplyForm");
 
-    const rows = SUPPLY_ITEMS.map(createItemRow);
+    const rows = supplyItems.map(createItemRow);
 
     const actions = document.createElement("div");
     actions.className = "form-actions";
@@ -197,12 +271,13 @@ function updateSub(item) {
 }
 
 function selectedItems() {
-    return SUPPLY_ITEMS
+    return supplyItems
             .filter((item) => quantities[item.code] > 0)
             .map((item) => ({
+                itemCode: item.code,
                 itemName: item.name,
-                display: itemDisplay(item),
-                detail: item.perPack > 1 ? `${formatNumber(quantities[item.code])}${item.unit}` : "",
+                display: makeDisplay(item.perPack, item.packUnit, item.unit, quantities[item.code]),
+                quantity: quantities[item.code],
                 amount: amountOf(item)
             }));
 }
@@ -246,7 +321,7 @@ function closeConfirm() {
     document.getElementById("confirmModal").classList.remove("open");
 }
 
-function confirmOrder() {
+async function confirmOrder() {
     const items = selectedItems();
 
     if (items.length === 0) {
@@ -254,20 +329,33 @@ function confirmOrder() {
         return;
     }
 
-    orders.unshift({
-        createdAt: new Date().toISOString(),
-        status: "REQUESTED",
-        items,
-        totalAmount: items.reduce((sum, item) => sum + item.amount, 0)
-    });
+    const confirmButton = document.getElementById("modalConfirm");
+    confirmButton.disabled = true;
 
-    resetForm();
-    closeConfirm();
-    renderOrders();
+    try {
+        const response = await fetch("/api/v1/supply-orders", {
+            method: "POST",
+            headers: jsonHeaders(),
+            body: JSON.stringify({
+                items: items.map((item) => ({itemCode: item.itemCode, quantity: item.quantity}))
+            })
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        resetForm();
+        closeConfirm();
+        await loadOrders();
+        renderOrders();
+    } finally {
+        confirmButton.disabled = false;
+    }
 }
 
 function resetForm() {
-    SUPPLY_ITEMS.forEach((item) => {
+    supplyItems.forEach((item) => {
         quantities[item.code] = item.defaultQty;
 
         if (item.control === "stepper") {
@@ -348,26 +436,6 @@ function createOrderCard(order) {
     return card;
 }
 
-function loadDummyOrders() {
-    orders = [
-        {
-            createdAt: new Date(Date.now() - 3600000).toISOString(),
-            status: "DEPOSITED",
-            items: [{itemName: "반죽믹스", display: "10포"}],
-            totalAmount: 350000
-        },
-        {
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            status: "SHIPPED",
-            items: [
-                {itemName: "반죽믹스", display: "20포"},
-                {itemName: "비닐봉투", display: "6,000매 (1묶음)"}
-            ],
-            totalAmount: 852000
-        }
-    ];
-}
-
 function bindModal() {
     document.getElementById("modalCancel").addEventListener("click", closeConfirm);
     document.getElementById("modalConfirm").addEventListener("click", confirmOrder);
@@ -378,11 +446,12 @@ function bindModal() {
     });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     loadStore();
-    renderForm();
     bindModal();
+    await loadCatalog();
+    renderForm();
     resetForm();
-    loadDummyOrders();
+    await loadOrders();
     renderOrders();
 });
