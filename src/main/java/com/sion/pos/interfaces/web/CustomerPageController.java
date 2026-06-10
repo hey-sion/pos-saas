@@ -22,6 +22,8 @@ public class CustomerPageController {
         Store store = storeService.getStoreBySlug(slug);
         model.addAttribute("storeId", store.getId());
         model.addAttribute("storeName", store.getName());
+        model.addAttribute("storePhone", store.getPhone());
+        model.addAttribute("businessInfo", store.getBusinessInfo());
         return "customer/order";
     }
 }

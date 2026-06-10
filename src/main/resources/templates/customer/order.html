@@ -413,6 +413,50 @@
             font-size: 18px;
             font-weight: 900;
         }
+
+        .biz-footer {
+            width: min(100%, 960px);
+            margin: 0 auto;
+            padding: 20px 16px 28px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .biz-info {
+            display: grid;
+            gap: 4px;
+        }
+
+        .biz-info > div {
+            display: flex;
+            gap: 6px;
+            font-size: 11px;
+            line-height: 1.5;
+            font-weight: 600;
+        }
+
+        .biz-info dt {
+            flex: 0 0 auto;
+            color: var(--gray-400);
+        }
+
+        .biz-info dd {
+            color: var(--gray-600);
+            word-break: keep-all;
+        }
+
+        .biz-copy {
+            margin-top: 12px;
+            color: var(--gray-400);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        @media (min-width: 720px) {
+            .biz-footer {
+                padding-right: 24px;
+                padding-left: 24px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -447,6 +491,40 @@
 
         <div class="empty-state" id="emptyMenuMessage" hidden>주문 가능한 메뉴가 없습니다.</div>
     </section>
+
+    <footer class="biz-footer" th:if="${businessInfo != null}" aria-label="사업자 정보">
+        <dl class="biz-info">
+            <div>
+                <dt>상호</dt>
+                <dd th:text="${storeName}">매장명</dd>
+            </div>
+            <div th:if="${businessInfo.representativeName != null}">
+                <dt>대표자</dt>
+                <dd th:text="${businessInfo.representativeName}"></dd>
+            </div>
+            <div th:if="${businessInfo.businessRegistrationNumber != null}">
+                <dt>사업자등록번호</dt>
+                <dd th:text="${businessInfo.businessRegistrationNumber}"></dd>
+            </div>
+            <div th:if="${businessInfo.mailOrderSalesNumber != null}">
+                <dt>통신판매업 신고번호</dt>
+                <dd th:text="${businessInfo.mailOrderSalesNumber}"></dd>
+            </div>
+            <div th:if="${businessInfo.businessAddress != null}">
+                <dt>주소</dt>
+                <dd th:text="${businessInfo.businessAddress}"></dd>
+            </div>
+            <div th:if="${storePhone != null}">
+                <dt>고객센터</dt>
+                <dd th:text="${storePhone}"></dd>
+            </div>
+            <div th:if="${businessInfo.businessEmail != null}">
+                <dt>이메일</dt>
+                <dd th:text="${businessInfo.businessEmail}"></dd>
+            </div>
+        </dl>
+        <p class="biz-copy" th:text="'© ' + ${storeName}">© 매장명</p>
+    </footer>
 </main>
 
 <aside class="cart-sheet" aria-label="장바구니">
