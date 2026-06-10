@@ -36,6 +36,8 @@ public class SecurityConfig {
     private static final String CUSTOMER_API_PATTERN = "/api/v1/customer/**";
     /** 손님 주문 화면. `/order/{storeId}` 한 세그먼트만 공개(와일드카드 X — 하위 경로 자동 공개 방지). */
     private static final String CUSTOMER_PAGE_PATTERN = "/order/*";
+    /** 손님 약관/정책 화면. `/order/{slug}/policy/{type}` 만 공개. */
+    private static final String CUSTOMER_POLICY_PATTERN = "/order/*/policy/*";
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -47,7 +49,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN).permitAll()
-                        .requestMatchers(CUSTOMER_API_PATTERN, CUSTOMER_PAGE_PATTERN).permitAll()
+                        .requestMatchers(CUSTOMER_API_PATTERN, CUSTOMER_PAGE_PATTERN, CUSTOMER_POLICY_PATTERN).permitAll()
                         .requestMatchers("/login", "/css/**", "/js/**", "/favicon.ico", "/error").permitAll()
                         // default-deny: 공개 경로만 위에서 열고 나머지는 전부 인증 필요
                         .anyRequest().authenticated()

@@ -444,11 +444,28 @@
             word-break: keep-all;
         }
 
-        .biz-copy {
-            margin-top: 12px;
-            color: var(--gray-400);
+        .biz-policies {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            margin-top: 14px;
+        }
+
+        .biz-policies a {
+            color: var(--gray-600);
             font-size: 11px;
             font-weight: 700;
+            text-decoration: none;
+        }
+
+        .biz-policies a:hover {
+            text-decoration: underline;
+        }
+
+        .biz-sep {
+            color: var(--gray-300);
+            font-size: 11px;
         }
 
         @media (min-width: 720px) {
@@ -523,7 +540,13 @@
                 <dd th:text="${businessInfo.businessEmail}"></dd>
             </div>
         </dl>
-        <p class="biz-copy" th:text="'© ' + ${storeName}">© 매장명</p>
+        <nav class="biz-policies" aria-label="약관 및 정책">
+            <a th:href="@{/order/{slug}/policy/terms(slug=${slug})}">이용약관</a>
+            <span class="biz-sep" aria-hidden="true">·</span>
+            <a th:href="@{/order/{slug}/policy/privacy(slug=${slug})}">개인정보처리방침</a>
+            <span class="biz-sep" aria-hidden="true">·</span>
+            <a th:href="@{/order/{slug}/policy/refund(slug=${slug})}">취소·환불 정책</a>
+        </nav>
     </footer>
 </main>
 

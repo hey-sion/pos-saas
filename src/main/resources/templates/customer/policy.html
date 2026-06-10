@@ -1,0 +1,224 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title th:text="${policyTitle} + ' · ' + ${storeName}">정책</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f5f6f8;
+            --white: #ffffff;
+            --gray-200: #e5e8eb;
+            --gray-400: #b0b8c1;
+            --gray-500: #8b95a1;
+            --gray-600: #6b7684;
+            --gray-700: #4e5968;
+            --gray-800: #333d4b;
+            --gray-900: #191f28;
+            --blue-500: #3182f6;
+            --font: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        }
+
+        html { background: var(--bg); }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--gray-900);
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .top-bar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 56px;
+            padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+            border-bottom: 1px solid var(--gray-200);
+            background: rgba(255,255,255,0.94);
+            backdrop-filter: blur(12px);
+        }
+
+        .back-link {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            color: var(--gray-700);
+            font-size: 22px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .back-link:active { background: var(--gray-200); }
+
+        .bar-title {
+            overflow: hidden;
+            color: var(--gray-900);
+            font-size: 17px;
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .doc {
+            width: min(100%, 760px);
+            margin: 0 auto;
+            padding: 20px 16px calc(40px + env(safe-area-inset-bottom));
+        }
+
+        .doc h2 {
+            margin-bottom: 4px;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .doc .store-line {
+            margin-bottom: 20px;
+            color: var(--gray-500);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .doc section { margin-bottom: 20px; }
+
+        .doc h3 {
+            margin-bottom: 8px;
+            color: var(--gray-800);
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .doc p, .doc li {
+            color: var(--gray-700);
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.65;
+            word-break: keep-all;
+        }
+
+        .doc ul, .doc ol {
+            margin-top: 6px;
+            padding-left: 18px;
+        }
+
+        .doc li { margin-bottom: 4px; }
+
+        .doc .note {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--gray-200);
+            color: var(--gray-500);
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+<header class="top-bar">
+    <a class="back-link" th:href="@{/order/{slug}(slug=${slug})}" aria-label="주문 화면으로">‹</a>
+    <h1 class="bar-title" th:text="${policyTitle}">정책</h1>
+</header>
+
+<main class="doc" th:inline="text">
+    <h2 th:text="${policyTitle}">정책</h2>
+    <p class="store-line">[[${storeName}]]</p>
+
+    <!-- 이용약관 -->
+    <th:block th:if="${policyType == 'terms'}">
+        <section>
+            <h3>제1조 (목적)</h3>
+            <p>본 약관은 [[${storeName}]](이하 "매장")가 제공하는 주문·결제 서비스(매장 내 주문 및 QR 셀프주문을 포함하며, 이하 "서비스")의 이용 조건 및 절차를 정함을 목적으로 합니다.</p>
+        </section>
+        <section>
+            <h3>제2조 (주문 및 결제)</h3>
+            <ol>
+                <li>고객은 메뉴를 주문하고 결제를 완료함으로써 주문을 신청합니다.</li>
+                <li>결제가 정상 승인된 시점에 주문이 접수됩니다.</li>
+                <li>결제는 결제대행사(포트원·카카오페이 등)를 통해 처리됩니다.</li>
+            </ol>
+        </section>
+        <section>
+            <h3>제3조 (주문의 거절)</h3>
+            <p>매장은 메뉴 품절, 영업 종료, 천재지변 등 부득이한 사유가 있는 경우 주문을 거절할 수 있으며, 이 경우 결제 금액을 전액 환불합니다.</p>
+        </section>
+        <section>
+            <h3>제4조 (취소 및 환불)</h3>
+            <p>주문의 취소 및 환불은 매장이 별도로 정한 「취소·환불 정책」에 따릅니다.</p>
+        </section>
+        <section>
+            <h3>제5조 (책임의 한계)</h3>
+            <p>매장은 고객의 귀책사유 또는 결제대행사·통신사 등 제3자의 사유로 발생한 손해에 대하여 책임을 지지 않습니다.</p>
+        </section>
+    </th:block>
+
+    <!-- 개인정보처리방침 -->
+    <th:block th:if="${policyType == 'privacy'}">
+        <section>
+            <p>[[${storeName}]](이하 "매장")는 「개인정보 보호법」 등 관련 법령을 준수하며, 다음과 같이 개인정보를 처리합니다.</p>
+        </section>
+        <section>
+            <h3>1. 수집 항목 및 방법</h3>
+            <p>매장은 주문·결제 시 <b>주문정보(메뉴·수량·결제금액)</b>만을 처리하며, 고객의 성명·연락처 등 개인정보를 직접 수집하지 않습니다. 결제에 필요한 정보는 결제대행사를 통해 처리되며 매장이 직접 수집·보관하지 않습니다.</p>
+        </section>
+        <section>
+            <h3>2. 처리 목적</h3>
+            <p>주문 접수 및 이행, 결제 처리, 관련 법령에 따른 거래기록 보존을 위하여 처리합니다.</p>
+        </section>
+        <section>
+            <h3>3. 결제 처리 위탁</h3>
+            <p>매장은 결제 처리를 위해 결제대행사(예: 주식회사 코리아포트원, 카카오페이)에 관련 업무를 위탁하며, 결제정보는 해당 결제대행사의 개인정보처리방침에 따라 처리됩니다.</p>
+        </section>
+        <section>
+            <h3>4. 보유 및 이용 기간</h3>
+            <p>「전자상거래 등에서의 소비자보호에 관한 법률」 등 관계 법령에서 정한 기간 동안 거래기록을 보존합니다. (예: 대금결제 및 재화 등의 공급에 관한 기록 5년, 소비자의 불만 또는 분쟁처리에 관한 기록 3년)</p>
+        </section>
+        <section>
+            <h3>5. 개인정보 보호책임자</h3>
+            <p>성명: <span th:text="${businessInfo != null ? businessInfo.representativeName : ''}">대표자</span><br>
+                연락처: <span th:text="${storePhone}">매장 전화</span></p>
+            <p>개인정보 관련 열람·정정·삭제 등의 요청은 위 연락처로 하실 수 있습니다.</p>
+        </section>
+    </th:block>
+
+    <!-- 취소·환불 정책 -->
+    <th:block th:if="${policyType == 'refund'}">
+        <section>
+            <p>[[${storeName}]](이하 "매장")의 주문 취소 및 환불 기준은 다음과 같습니다.</p>
+        </section>
+        <section>
+            <h3>1. 조리 시작 전 취소</h3>
+            <p>결제 후 조리가 시작되기 전에는 매장 직원에게 요청하시면 주문을 취소하고 전액 환불해 드립니다.</p>
+        </section>
+        <section>
+            <h3>2. 조리 시작 후 취소 제한</h3>
+            <p>본 매장의 상품은 주문 즉시 조리되는 식품으로, 조리가 시작된 이후에는 「전자상거래 등에서의 소비자보호에 관한 법률」 제17조제2항에 따라 단순 변심에 의한 청약철회(취소·환불)가 제한됩니다.</p>
+        </section>
+        <section>
+            <h3>3. 매장 귀책 사유</h3>
+            <p>상품의 하자, 오조리, 누락 등 매장의 귀책사유가 있는 경우에는 조리 여부와 관계없이 재조리 또는 전액 환불해 드립니다.</p>
+        </section>
+        <section>
+            <h3>4. 환불 방법</h3>
+            <p>환불은 매장 직원에게 요청하시면 원래 결제수단으로 처리되며, 결제대행사를 통한 처리 절차상 영업일 기준 수일이 소요될 수 있습니다.</p>
+        </section>
+        <section>
+            <h3>5. 문의</h3>
+            <p>[[${storeName}]] / <span th:text="${storePhone}">매장 전화</span></p>
+        </section>
+    </th:block>
+
+    <p class="note">본 문서는 [[${storeName}]]에 적용되며, 게시한 날부터 시행됩니다.</p>
+</main>
+</body>
+</html>
