@@ -4,6 +4,7 @@ import com.sion.pos.domain.BaseEntity;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -24,6 +25,9 @@ public class Store extends BaseEntity {
 
     @Column(length = 30, unique = true)
     private String slug;
+
+    @Embedded
+    private BusinessInfo businessInfo;
 
     public static Store create(String name, String phone) {
         if (name == null || name.isBlank()) {
@@ -47,5 +51,13 @@ public class Store extends BaseEntity {
 
     public boolean isQrOrderEnabled() {
         return slug != null;
+    }
+
+    public void updateBusinessInfo(BusinessInfo businessInfo) {
+        if (businessInfo == null) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "businessInfo는 필수입니다.");
+        }
+
+        this.businessInfo = businessInfo;
     }
 }
