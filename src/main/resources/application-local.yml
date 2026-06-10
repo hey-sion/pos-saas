@@ -1,0 +1,12 @@
+# 로컬 개발 전용 프로파일.
+# 템플릿/정적 리소스를 build 산출물이 아닌 소스 폴더에서 직접 읽어,
+# 저장 후 브라우저 새로고침만으로 반영되게 한다(서버 재시작 불필요).
+# 운영(jar 실행)에서는 이 프로파일을 켜지 않으므로 classpath 기본 동작을 따른다.
+spring:
+  thymeleaf:
+    prefix: file:src/main/resources/templates/
+  web:
+    resources:
+      static-locations:
+        - file:src/main/resources/static/
+        - classpath:/static/
