@@ -19,6 +19,16 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: ${SERVER_SESSION_TIMEOUT:8h}
+
+# 자동 로그인(remember-me). 매장 태블릿 등 신뢰된 기기에서 30일간 재로그인 없이 유지.
+# key는 운영에서 환경변수로 교체 — 비밀번호 변경 시 토큰은 자동 무효화
+security:
+  remember-me:
+    key: ${REMEMBER_ME_KEY:local-dev-remember-me-key}
+    validity-seconds: ${REMEMBER_ME_VALIDITY_SECONDS:2592000}
 
 portone:
   store-id: ${PORTONE_STORE_ID:store-test}

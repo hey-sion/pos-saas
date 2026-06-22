@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -45,7 +46,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            @Value("${security.remember-me.key}") String rememberMeKey,
+            @Value("${security.remember-me.validity-seconds}") int rememberMeValiditySeconds
+    ) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN).permitAll()
@@ -62,6 +67,14 @@ public class SecurityConfig {
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login")
                         .permitAll()
+                )
+                // 자동 로그인: 신뢰된 매장 기기에서 세션 만료·재배포에도 재로그인 없이 유지.
+                // 해시 기반(TokenBasedRememberMeServices) — 서버 측 토큰 저장 불필요, 비밀번호 변경 시 자동 무효화.
+                // alwaysRemember=true: 별도 체크박스 없이 로그인하면 항상 자동 로그인 쿠키 발급.
+                .rememberMe(rememberMe -> rememberMe
+                        .key(rememberMeKey)
+                        .alwaysRemember(true)
+                        .tokenValiditySeconds(rememberMeValiditySeconds)
                 )
                 // 인증 안 된 API 호출은 로그인 페이지로 리다이렉트하지 말고 401을 준다(JSON 클라이언트용). 페이지는 기본 로그인 리다이렉트 유지.
                 .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(
