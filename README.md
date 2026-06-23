@@ -27,13 +27,6 @@
 - 매장 POS 페이지: `https://smilepos.kr` (로그인 필요)
 - 손님 셀프 주문 페이지: `https://smilepos.kr/order/cafe-spring` (모바일용 샘플 페이지, 테스트 결제 가능)
 
-EC2 단일 인스턴스 + Docker Compose + Nginx 리버스 프록시 + Let's Encrypt HTTPS 조합.
-
-- DNS: 가비아 도메인 + Route53 호스팅 영역 + A 레코드 (EIP 고정)
-- 컨테이너: `restart: unless-stopped` 로 인스턴스 재시작 시 자동 복구
-- 인증서: certbot 자동 갱신 (`certbot-renew.timer`)
-- 배포: 현재 수동. CI/CD는 도입 예정 (다음 단계)
-
 ## Architecture Highlights
 
 설계 의사결정과 근거는 [case-study](docs/portfolio/case-study.md)에 자세히. 요약하면:
