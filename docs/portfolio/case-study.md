@@ -39,43 +39,7 @@
 
 ---
 
-## 3. 기술 스택
-
-- **Language/Runtime** — Java 21, Spring Boot 3.4.4
-- **Web/Persistence** — Spring Web, Spring Data JPA, Thymeleaf, Validation
-- **Security** — Spring Security (세션 form login, BCrypt)
-- **DB** — MySQL 8.4 + Flyway 마이그레이션
-- **PG** — PortOne v2 (카카오페이 — PC IFRAME / 모바일 REDIRECTION)
-- **Test** — JUnit5, Testcontainers(MySQL)
-- **Build** — Gradle Kotlin DSL
-- **Infra** — Docker Compose, EC2(Amazon Linux 2023), Nginx 리버스 프록시, Let's Encrypt HTTPS
-
----
-
-## 4. 아키텍처 개요
-
-도메인 코드는 **4-layer**로 나누고, 각 레이어 안에서 도메인(`menu`·`order`·`payment`·`store`)으로 한 단계 더 나눴다.
-
-```
-com.sion.pos
-├── config         # SecurityConfig, WebConfig
-├── interfaces     # 외부 진입점 (REST API + Thymeleaf 페이지)
-├── application    # Facade (트랜잭션 경계 + 비즈니스 조율)
-├── domain         # 엔티티, 도메인 서비스, Repository 인터페이스
-├── infrastructure # JPA Repository 구현체, 외부 API 어댑터
-└── support        # 공통 (예외, PortOne 게이트웨이, 보안 헬퍼, 시간)
-```
-
-### 핵심 설계 규칙 — JPA 연관관계 매핑 금지, ID 참조만
-
-`@ManyToOne`/`@OneToMany` 등을 쓰지 않고 애그리거트 간 참조를 전부 **Long ID**로 표현했다.
-
-- **이유** — 애그리거트 경계를 명확히 하고(Order → Store는 다른 애그리거트), N+1·LazyInitializationException·양방향 무한루프 같은 JPA 함정을 피하고, 멀티테넌트/향후 분리 시 DB 분리 비용을 낮춘다.
-- **대가** — join이 필요한 조회는 QueryDSL이나 읽기 전용 ReadModel 사용과 같이 *명시적* 처리가 필요하다.
-
----
-
-## 5. 핵심 설계
+## 3. 핵심 설계
 
 ### ① PG 결제 정합성
 
@@ -169,7 +133,7 @@ stateDiagram-v2
 
 ---
 
-## 6. 현황
+## 4. 현황
 
 - 2026-06-02부터 부모님 매장에서 실사용 중. 첫날 함께 주문을 받으며 확인했고, 현재까지 매장에서 사용 중.
 - 라이브: `https://smilepos.kr` · 손님 셀프주문 데모: `https://smilepos.kr/order/cafe-spring` (로그인 없이 QR 플로우 확인 가능)
