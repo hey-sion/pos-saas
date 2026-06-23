@@ -4,17 +4,6 @@
 
 사장님은 태블릿/PC 웹에서 메뉴를 관리하고 매장에서 주문을 받는다. 손님은 매장에 붙은 QR을 찍으면 모바일에서 메뉴를 보고 직접 주문·결제까지 끝낼 수 있다. 결제는 두 갈래로 나뉜다. 사장님이 POS에서 직접 처리하는 오프라인 결제(현금, 실물 카드)와, 손님이 셀프로 처리하는 간편결제(카카오페이/PortOne 연동).
 
-## Stack
-
-- **Language/Runtime**: Java 21, Spring Boot 3.4.4
-- **Web/Persistence**: Spring Web, Spring Data JPA, Thymeleaf, Validation
-- **Security**: Spring Security (세션 form login, BCrypt)
-- **DB**: MySQL 8.4 + Flyway 마이그레이션
-- **PG**: PortOne v2 (카카오페이 - PC IFRAME / 모바일 REDIRECTION)
-- **Test**: JUnit5, Testcontainers (MySQL)
-- **Build**: Gradle Kotlin DSL
-- **Infra**: Docker Compose, EC2(Amazon Linux 2023), Nginx 리버스 프록시, Let's Encrypt HTTPS
-
 ## Screens
 
 | 매장 POS (메뉴 선택·주문 접수·고객 대기) | 손님 QR 셀프 주문 (모바일) |
@@ -29,7 +18,7 @@
 
 ## Architecture Highlights
 
-설계 의사결정과 근거는 [case-study](docs/portfolio/case-study.md)에 자세히. 요약하면:
+📄 **[Case Study — 개발 의도 · 설계 의사결정 →](docs/portfolio/case-study.md)** 개발 의도와 주요 설계 의사결정은 별도 문서로 정리. 핵심만 요약하면:
 
 - **멀티테넌트 격리** — storeId를 세션에서 파생, 단건 접근은 `id+storeId`로 묶어 IDOR/BOLA 차단
 - **결제 정합성** — verify + 웹훅 이중화 + 조건부 UPDATE로 멱등 처리
@@ -51,7 +40,13 @@ com.sion.pos
 
 `config` / `support` 는 어느 레이어에도 속하지 않는 횡단 관심사.
 
-## References
+## Stack
 
-- 케이스 스터디 (설계·의사결정): [`docs/portfolio/case-study.md`](docs/portfolio/case-study.md)
-- 컨벤션 / AI 협업 가이드: [`CLAUDE.md`](CLAUDE.md)
+- **Language/Runtime**: Java 21, Spring Boot 3.4.4
+- **Web/Persistence**: Spring Web, Spring Data JPA, Thymeleaf, Validation
+- **Security**: Spring Security (세션 form login, BCrypt)
+- **DB**: MySQL 8.4 + Flyway 마이그레이션
+- **PG**: PortOne v2 (카카오페이 - PC IFRAME / 모바일 REDIRECTION)
+- **Test**: JUnit5, Testcontainers (MySQL)
+- **Build**: Gradle Kotlin DSL
+- **Infra**: Docker Compose, EC2(Amazon Linux 2023), Nginx 리버스 프록시, Let's Encrypt HTTPS
