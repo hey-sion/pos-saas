@@ -58,6 +58,40 @@ class StoreTest {
         }
     }
 
+    @Nested
+    @DisplayName("카카오페이 실결제 설정 시, ")
+    class KakaoPayLive {
+
+        @Test
+        @DisplayName("매장 생성 직후에는 카카오페이가 테스트 결제 상태이다")
+        void isTestModeByDefault() {
+            Store store = Store.create("스마일카페", "02-1234-5678");
+
+            assertThat(store.isKakaoPayLive()).isFalse();
+        }
+
+        @Test
+        @DisplayName("실결제를 활성화하면 실결제 상태가 된다")
+        void enablesLivePayment() {
+            Store store = Store.create("스마일카페", "02-1234-5678");
+
+            store.enableKakaoPayLive();
+
+            assertThat(store.isKakaoPayLive()).isTrue();
+        }
+
+        @Test
+        @DisplayName("실결제를 비활성화하면 테스트 결제 상태로 돌아간다")
+        void disablesLivePayment() {
+            Store store = Store.create("스마일카페", "02-1234-5678");
+            store.enableKakaoPayLive();
+
+            store.disableKakaoPayLive();
+
+            assertThat(store.isKakaoPayLive()).isFalse();
+        }
+    }
+
     private static void expects(ErrorType expected, ThrowingCallable callable) {
         assertThatThrownBy(callable).isInstanceOfSatisfying(PosApplicationException.class,
                                     e -> assertThat(e.getErrorType()).isEqualTo(expected));

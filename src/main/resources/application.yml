@@ -36,7 +36,9 @@ portone:
   api-base-url: ${PORTONE_API_BASE_URL:https://api.portone.io}
   webhook-secret: ${PORTONE_WEBHOOK_SECRET:dGVzdC13ZWJob29rLXNlY3JldA==}
   channel-keys:
-    KAKAO_PAY: ${PORTONE_CHANNEL_KEY_KAKAO_PAY:channel-key-test-kakao}
+    KAKAO_PAY:
+      test: ${PORTONE_CHANNEL_KEY_KAKAO_PAY:channel-key-test-kakao}
+      live: ${PORTONE_CHANNEL_KEY_KAKAO_PAY_LIVE:}
 
 logging:
   level:

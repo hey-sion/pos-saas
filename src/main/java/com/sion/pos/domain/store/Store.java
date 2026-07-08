@@ -29,6 +29,9 @@ public class Store extends BaseEntity {
     @Embedded
     private BusinessInfo businessInfo;
 
+    @Column(name = "kakao_pay_live", nullable = false)
+    private boolean kakaoPayLive;
+
     public static Store create(String name, String phone) {
         if (name == null || name.isBlank()) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "name은 필수입니다.");
@@ -51,6 +54,14 @@ public class Store extends BaseEntity {
 
     public boolean isQrOrderEnabled() {
         return slug != null;
+    }
+
+    public void enableKakaoPayLive() {
+        this.kakaoPayLive = true;
+    }
+
+    public void disableKakaoPayLive() {
+        this.kakaoPayLive = false;
     }
 
     public void updateBusinessInfo(BusinessInfo businessInfo) {
