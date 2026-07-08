@@ -12,17 +12,22 @@ public record PortOneProperties(
         String apiSecret,
         String apiBaseUrl,
         String webhookSecret,
-        Map<String, String> channelKeys
+        Map<String, ChannelKey> channelKeys
 ) {
 
-    public String channelKeyOf(Payment.Provider provider) {
+    /** provider별 테스트/실연동 채널 키. 실결제 여부는 매장(store.kakaoPayLive)이 결정한다. */
+    public record ChannelKey(String test, String live) {}
+
+    public String channelKeyOf(Payment.Provider provider, boolean useLiveChannel) {
         if (provider == null) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "provider는 필수입니다.");
         }
 
-        String key = channelKeys != null ? channelKeys.get(provider.name()) : null;
+        ChannelKey channelKey = channelKeys != null ? channelKeys.get(provider.name()) : null;
+        String key = channelKey == null ? null : (useLiveChannel ? channelKey.live() : channelKey.test());
         if (key == null || key.isBlank()) {
-            throw new PosApplicationException(ErrorType.INTERNAL_ERROR, "PortOne 채널 키가 설정되지 않았습니다: " + provider);
+            throw new PosApplicationException(ErrorType.INTERNAL_ERROR,
+                    "PortOne 채널 키가 설정되지 않았습니다: " + provider + (useLiveChannel ? "(live)" : "(test)"));
         }
 
         return key;

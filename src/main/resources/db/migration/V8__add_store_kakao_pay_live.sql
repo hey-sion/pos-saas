@@ -1,0 +1,2 @@
+ALTER TABLE store
+    ADD COLUMN kakao_pay_live BOOLEAN NOT NULL DEFAULT FALSE;

@@ -53,8 +53,8 @@ class PaymentFacadeIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        Store store = storeRepository.save(Store.create("1번 테스트 매장", "010-1234-5678"));
-        storeId = store.getId();
+        Store store = Store.create("1번 테스트 매장", "010-1234-5678");
+        storeId = storeRepository.save(store).getId();
         americanoId = menuRepository.save(Menu.create(storeId, "아메리카노", AMERICANO_PRICE, 1)).getId();
     }
 

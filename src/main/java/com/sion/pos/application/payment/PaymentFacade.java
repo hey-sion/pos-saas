@@ -7,6 +7,8 @@ import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.domain.payment.PaymentGateway;
 import com.sion.pos.domain.payment.PaymentGatewayResult;
 import com.sion.pos.domain.payment.PaymentRepository;
+import com.sion.pos.domain.store.Store;
+import com.sion.pos.domain.store.StoreRepository;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import com.sion.pos.support.portone.PortOneProperties;
@@ -31,6 +33,7 @@ public class PaymentFacade {
 
     private final OrderService orderService;
     private final OrderRepository orderRepository;
+    private final StoreRepository storeRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
     private final PortOneProperties portOneProperties;
@@ -65,6 +68,7 @@ public class PaymentFacade {
         invalidatePendingPgPayments(payments);
 
         if (command.method() == Payment.Method.EASY_PAY) {
+            Store store = getStore(order.getStoreId());
             Payment payment = paymentRepository.save(Payment.createPg(
                     order.getId(),
                     command.provider(),
@@ -73,7 +77,7 @@ public class PaymentFacade {
             return PaymentCreateInfo.pg(
                     payment,
                     portOneProperties.storeId(),
-                    portOneProperties.channelKeyOf(command.provider()),
+                    portOneProperties.channelKeyOf(command.provider(), store.isKakaoPayLive()),
                     orderService.summarizeItems(order.getId())
             );
         }
@@ -171,6 +175,11 @@ public class PaymentFacade {
                 // PortOne 측에서도 아직 결제 완료 안 됨. PENDING 그대로 유지.
             }
         }
+    }
+
+    private Store getStore(Long storeId) {
+        return storeRepository.findById(storeId)
+                              .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "존재하지 않는 매장입니다."));
     }
 
     private String generatePgPaymentId() {
