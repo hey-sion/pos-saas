@@ -1,0 +1,68 @@
+# 로컬 멀티인스턴스 테스트 환경 (운영 app-compose.yml 과 별개).
+# nginx(:8080) → app-1, app-2 → 개발 MySQL(host.docker.internal:3306) + redis.
+# 실행: docker compose -f docker/local-cluster-compose.yml --env-file .env up --build
+
+name: pos-saas-local
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: pos-local-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/local-cluster.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app-1
+      - app-2
+
+  app-1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: pos-saas-local:latest
+    container_name: pos-local-app-1
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: cluster
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SERVER_PORT: 8080
+    depends_on:
+      - redis
+
+  app-2:
+    image: pos-saas-local:latest
+    container_name: pos-local-app-2
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: cluster
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SERVER_PORT: 8080
+    # app-1 이 Flyway 마이그레이션을 먼저 끝내도록 순서만 준다.
+    depends_on:
+      app-1:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    container_name: pos-local-redis
+    restart: unless-stopped
+    # notify-keyspace-events: 세션 만료 정리를 위한 keyspace 알림.
+    command: ["redis-server", "--notify-keyspace-events", "Egx"]
+    ports:
+      - "6380:6379"
