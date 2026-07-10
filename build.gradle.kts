@@ -24,6 +24,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-security")
 
+    // cluster 프로파일 전용 Redis 세션 (기본 프로파일은 인메모리).
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("org.springframework.session:spring-session-data-redis")
+
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
 

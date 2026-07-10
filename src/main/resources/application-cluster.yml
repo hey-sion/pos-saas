@@ -1,0 +1,11 @@
+# cluster 프로파일 — 멀티인스턴스 전용. 세션을 Redis 에 저장해 공유한다.
+spring:
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+# remember-me 를 끈다 — 무상태라 강제 로그아웃을 우회하므로, revocable 한 Redis 세션으로 대체.
+security:
+  remember-me:
+    enabled: false

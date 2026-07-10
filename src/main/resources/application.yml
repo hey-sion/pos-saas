@@ -1,6 +1,12 @@
 spring:
   application:
     name: pos-saas
+  # 기본 프로파일은 인메모리 세션 유지(Redis 없이 부팅). Redis 세션은 cluster 프로파일에서만 켠다.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.session.SessionAutoConfiguration
+      # Redis 는 세션 저장용으로만 쓴다 — 레포지토리 스캔 불필요.
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/pos_saas?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul}
     username: ${SPRING_DATASOURCE_USERNAME:pos}

@@ -48,6 +48,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
+            @Value("${security.remember-me.enabled:true}") boolean rememberMeEnabled,
             @Value("${security.remember-me.key}") String rememberMeKey,
             @Value("${security.remember-me.validity-seconds}") int rememberMeValiditySeconds
     ) throws Exception {
@@ -68,14 +69,6 @@ public class SecurityConfig {
                         .logoutSuccessUrl("/login")
                         .permitAll()
                 )
-                // 자동 로그인: 신뢰된 매장 기기에서 세션 만료·재배포에도 재로그인 없이 유지.
-                // 해시 기반(TokenBasedRememberMeServices) — 서버 측 토큰 저장 불필요, 비밀번호 변경 시 자동 무효화.
-                // alwaysRemember=true: 별도 체크박스 없이 로그인하면 항상 자동 로그인 쿠키 발급.
-                .rememberMe(rememberMe -> rememberMe
-                        .key(rememberMeKey)
-                        .alwaysRemember(true)
-                        .tokenValiditySeconds(rememberMeValiditySeconds)
-                )
                 // 인증 안 된 API 호출은 로그인 페이지로 리다이렉트하지 말고 401을 준다(JSON 클라이언트용). 페이지는 기본 로그인 리다이렉트 유지.
                 .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
@@ -89,6 +82,14 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN, CUSTOMER_API_PATTERN)
                 )
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
+
+        // cluster 에선 꺼서 강제 로그아웃이 remember-me 재인증으로 우회되지 않게 한다.
+        if (rememberMeEnabled) {
+            http.rememberMe(rememberMe -> rememberMe
+                    .key(rememberMeKey)
+                    .alwaysRemember(true)
+                    .tokenValiditySeconds(rememberMeValiditySeconds));
+        }
 
         return http.build();
     }
