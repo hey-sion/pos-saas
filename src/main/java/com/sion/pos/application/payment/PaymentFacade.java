@@ -168,9 +168,15 @@ public class PaymentFacade {
                                                  .orElseThrow(() -> new PosApplicationException(
                                                          ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
                     order.markReceived();
+                    log.info("[PAYMENT_COMPLETED] paymentId={} orderId={} amount={}",
+                            payment.getId(), payment.getOrderId(), payment.getAmount());
                 }
             }
-            case FAILED -> paymentRepository.failIfPending(payment.getId(), result.failReason());
+            case FAILED -> {
+                paymentRepository.failIfPending(payment.getId(), result.failReason());
+                log.info("[PAYMENT_FAILED] paymentId={} orderId={} reason={}",
+                        payment.getId(), payment.getOrderId(), result.failReason());
+            }
             case PENDING -> {
                 // PortOne 측에서도 아직 결제 완료 안 됨. PENDING 그대로 유지.
             }

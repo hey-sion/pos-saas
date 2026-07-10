@@ -24,8 +24,17 @@ public class ApiControllerAdvice {
 
     @ExceptionHandler
     public ResponseEntity<ApiResponse<?>> handle(PosApplicationException e) {
-        log.warn("PosApplicationException [{}]: {}", e.getErrorType(), e.getMessage(), e);
-        return failureResponse(e.getErrorType(), e.getCustomMessage());
+        ErrorType errorType = e.getErrorType();
+        boolean serverError = errorType.getStatus().is5xxServerError();
+
+        if (serverError) {
+            log.error("PosApplicationException [{}]: {}", errorType, e.getMessage(), e);
+        } else {
+            log.warn("PosApplicationException [{}]: {}", errorType, e.getMessage(), e);
+        }
+
+        String clientMessage = serverError ? errorType.getMessage() : e.getCustomMessage();
+        return failureResponse(errorType, clientMessage);
     }
 
     @ExceptionHandler
