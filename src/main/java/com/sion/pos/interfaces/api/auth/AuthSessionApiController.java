@@ -4,7 +4,7 @@ import com.sion.pos.application.auth.AccountSessionService;
 import java.security.Principal;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,9 +23,9 @@ public class AuthSessionApiController {
         this.accountSessionService = accountSessionService;
     }
 
-    /** 로그인한 본인 계정의 모든 기기 세션을 무효화한다(자신의 현재 세션 포함). */
-    @PostMapping("/logout-all-devices")
-    public ResponseEntity<Void> logoutAllDevices(Principal principal) {
+    /** 로그인한 본인 계정의 모든 기기 세션을 무효화한다(자신의 현재 세션 포함) — 모든 기기 로그아웃. */
+    @DeleteMapping("/sessions")
+    public ResponseEntity<Void> deleteSessions(Principal principal) {
         accountSessionService.logoutAllDevices(principal.getName());
         return ResponseEntity.noContent().build();
     }

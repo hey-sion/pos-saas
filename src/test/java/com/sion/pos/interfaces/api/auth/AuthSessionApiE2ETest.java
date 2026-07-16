@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
@@ -79,7 +80,7 @@ class AuthSessionApiE2ETest {
 
             // Act — 한 기기에서 "모든 기기 로그아웃" 호출
             ResponseEntity<Void> response =
-                    device1.postForEntity("/api/v1/auth/logout-all-devices", null, Void.class);
+                    device1.exchange("/api/v1/auth/sessions", HttpMethod.DELETE, null, Void.class);
 
             // Assert — 204 + 그 계정 세션 전부 무효화
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
@@ -98,7 +99,7 @@ class AuthSessionApiE2ETest {
                     .isEqualTo(HttpStatus.OK);
 
             // Act — device1 에서 모든 기기 로그아웃
-            device1.postForEntity("/api/v1/auth/logout-all-devices", null, Void.class);
+            device1.exchange("/api/v1/auth/sessions", HttpMethod.DELETE, null, Void.class);
 
             // Assert — device2 는 인증이 풀려야 한다(remember-me 로 되살아나면 안 됨)
             assertThat(device2.getForEntity("/api/v1/orders/waiting", String.class).getStatusCode())
