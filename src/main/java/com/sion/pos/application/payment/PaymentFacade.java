@@ -1,6 +1,7 @@
 package com.sion.pos.application.payment;
 
 import com.sion.pos.application.order.OrderService;
+import com.sion.pos.application.order.WaitingOrdersUpdatedEvent;
 import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.payment.Payment;
@@ -20,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ public class PaymentFacade {
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
     private final PortOneProperties portOneProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public PaymentCreateInfo createPayment(Long storeId, PaymentCreateCommand command) {
@@ -87,7 +90,10 @@ public class PaymentFacade {
                 command.method(),
                 order.getTotalAmount(),
                 LocalDateTime.now(BUSINESS_ZONE)));
+
         order.markReceived();
+        eventPublisher.publishEvent(new WaitingOrdersUpdatedEvent(order.getStoreId()));
+
         return PaymentCreateInfo.offline(payment);
     }
 
@@ -168,6 +174,7 @@ public class PaymentFacade {
                                                  .orElseThrow(() -> new PosApplicationException(
                                                          ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
                     order.markReceived();
+                    eventPublisher.publishEvent(new WaitingOrdersUpdatedEvent(order.getStoreId()));
                     log.info("[PAYMENT_COMPLETED] paymentId={} orderId={} amount={}",
                             payment.getId(), payment.getOrderId(), payment.getAmount());
                 }

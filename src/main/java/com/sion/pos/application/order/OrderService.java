@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public Order getOrder(Long storeId, Long orderId) {
@@ -55,6 +57,8 @@ public class OrderService {
 
             case RECEIVED -> throw new PosApplicationException(ErrorType.BAD_REQUEST, "변경할 수 없는 주문 상태입니다.");
         }
+
+        eventPublisher.publishEvent(new WaitingOrdersUpdatedEvent(storeId));
     }
 
     @Transactional(readOnly = true)

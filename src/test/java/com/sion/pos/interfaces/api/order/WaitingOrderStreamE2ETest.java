@@ -56,6 +56,7 @@ class WaitingOrderStreamE2ETest {
         @DisplayName("대기목록 변경이 발행되면 해당 매장 화면이 waiting-orders-updated 이벤트를 받는다.")
         @Test
         void receivesEventOnNotify() throws Exception {
+            // arrange
             Store store = storeRepository.save(Store.create("테스트 매장", "010-0000-0000"));
             storeAccountService.register(store.getId(), "owner", PASSWORD);
             String cookie = ApiTestClient.sessionCookieHeader(port, "owner", PASSWORD);
@@ -81,8 +82,10 @@ class WaitingOrderStreamE2ETest {
                 await().atMost(Duration.ofSeconds(5))
                        .until(() -> received.stream().anyMatch(line -> line.contains("connected")));
 
+                // act
                 notifier.notifyUpdated(store.getId());
 
+                // assert
                 await().atMost(Duration.ofSeconds(5))
                        .until(() -> received.stream().anyMatch(line -> line.contains("waiting-orders-updated")));
             } finally {
