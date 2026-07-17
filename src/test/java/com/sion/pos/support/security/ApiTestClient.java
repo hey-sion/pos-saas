@@ -41,7 +41,26 @@ public final class ApiTestClient {
     /** form login으로 인증한 뒤, 이후 모든 요청에 세션 쿠키 + CSRF 토큰을 자동 첨부하는 클라이언트. */
     public static TestRestTemplate loggedIn(int port, String username, String password) {
         TestRestTemplate rest = plain(port);
+        Map<String, String> cookies = performLogin(rest, username, password);
+        String token = cookies.getOrDefault("XSRF-TOKEN", "");
+        String cookieHeader = cookieHeader(cookies);
 
+        rest.getRestTemplate().getInterceptors().add((request, body, execution) -> {
+            request.getHeaders().add(HttpHeaders.COOKIE, cookieHeader);
+            request.getHeaders().add("X-XSRF-TOKEN", token);
+            return execution.execute(request, body);
+        });
+
+        return rest;
+    }
+
+    /** form login 후 인증 세션 쿠키(Cookie 헤더 값)를 돌려준다. SSE 등 raw 스트림 연결용. */
+    public static String sessionCookieHeader(int port, String username, String password) {
+        return cookieHeader(performLogin(plain(port), username, password));
+    }
+
+    /** GET /login → POST /login 흐름을 수행하고 세션 쿠키 + 회전된 CSRF 토큰을 담은 쿠키 맵을 돌려준다. */
+    private static Map<String, String> performLogin(TestRestTemplate rest, String username, String password) {
         // 1) GET /login → XSRF-TOKEN 쿠키 획득
         ResponseEntity<String> loginPage = rest.getForEntity("/login", String.class);
         Map<String, String> cookies = parseSetCookies(loginPage.getHeaders());
@@ -68,16 +87,7 @@ public final class ApiTestClient {
 
         // 3) 로그인 성공 시 세션·CSRF 토큰이 회전된다 → 응답의 Set-Cookie로 갱신
         cookies.putAll(parseSetCookies(loginResult.getHeaders()));
-        String token = cookies.getOrDefault("XSRF-TOKEN", csrf);
-        String cookieHeader = cookieHeader(cookies);
-
-        rest.getRestTemplate().getInterceptors().add((request, body, execution) -> {
-            request.getHeaders().add(HttpHeaders.COOKIE, cookieHeader);
-            request.getHeaders().add("X-XSRF-TOKEN", token);
-            return execution.execute(request, body);
-        });
-
-        return rest;
+        return cookies;
     }
 
     private static ClientHttpRequestFactory nonFollowingFactory() {
