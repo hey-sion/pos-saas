@@ -469,15 +469,26 @@ async function refreshWaitingOrders() {
     renderWaitingOrders();
 }
 
-// 손님 QR 셀프주문/결제가 비동기로 들어오므로 3초 폴링으로 대기 목록을 갱신한다.
-// 결제 진행 중에는 스킵(슬롯 재렌더로 인한 깜빡임·불필요한 요청 방지). 실시간성이 더 중요해지면 SSE로 교체.
+// 손님 QR 셀프주문/결제가 비동기로 들어오므로, 서버가 대기목록 변경 시 SSE로 신호를 보내면 재조회한다.
+// EventSource는 연결이 끊기면 자동 재연결한다. 결제 진행 중에는 스킵(슬롯 재렌더 깜빡임·불필요한 요청 방지).
+function startWaitingOrdersStream() {
+    const stream = new EventSource("/api/v1/orders/waiting/stream");
+    stream.addEventListener("waiting-orders-updated", () => {
+        if (state.paymentInProgress) {
+            return;
+        }
+        refreshWaitingOrders();
+    });
+}
+
+// SSE가 실시간 갱신을 담당한다. 이 폴링은 SSE가 조용히 끊기거나 이벤트를 놓쳤을 때를 대비한 느슨한 폴백.
 function startWaitingOrdersPolling() {
     setInterval(() => {
         if (state.paymentInProgress) {
             return;
         }
         refreshWaitingOrders();
-    }, 3000);
+    }, 30000);
 }
 
 function renderWaitingOrders() {
@@ -704,5 +715,6 @@ document.addEventListener("DOMContentLoaded", () => {
     loadMenus();
     renderCart();
     refreshWaitingOrders();
+    startWaitingOrdersStream();
     startWaitingOrdersPolling();
 });
