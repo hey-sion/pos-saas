@@ -9,6 +9,7 @@ import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
@@ -48,6 +49,7 @@ public class OrderService {
             case DELIVERED -> {
                 validatePaymentCompleted(order.getId());
                 order.deliver();
+                eventPublisher.publishEvent(toOrderDeliveredEvent(order));
             }
 
             case CANCELLED -> {
@@ -59,6 +61,16 @@ public class OrderService {
         }
 
         eventPublisher.publishEvent(new WaitingOrdersUpdatedEvent(storeId));
+    }
+
+    private OrderDeliveredEvent toOrderDeliveredEvent(Order order) {
+        String eventId = "ORDER_DELIVERED:" + order.getStoreId()
+                + ":" + order.getOrderDate() + ":" + order.getOrderNumber();
+        return new OrderDeliveredEvent(
+                eventId,
+                order.getStoreId(),
+                LocalDateTime.now(BUSINESS_ZONE),
+                order.getTotalAmount());
     }
 
     @Transactional(readOnly = true)
