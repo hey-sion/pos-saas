@@ -1,5 +1,6 @@
 package com.sion.pos.application.order;
 
+import com.sion.pos.application.event.OutboxEventPublisher;
 import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
@@ -34,6 +35,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final OutboxEventPublisher outboxEventPublisher;
 
     @Transactional(readOnly = true)
     public Order getOrder(Long storeId, Long orderId) {
@@ -49,7 +51,7 @@ public class OrderService {
             case DELIVERED -> {
                 validatePaymentCompleted(order.getId());
                 order.deliver();
-                eventPublisher.publishEvent(toOrderDeliveredEvent(order));
+                outboxEventPublisher.publish("ORDER_DELIVERED", toOrderDeliveredEvent(order));
             }
 
             case CANCELLED -> {
