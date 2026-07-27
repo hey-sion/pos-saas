@@ -110,4 +110,48 @@ class SseEmitterRegistryTest {
             assertThatCode(() -> registry.push(999L)).doesNotThrowAnyException();
         }
     }
+
+    @DisplayName("heartbeat 시, ")
+    @Nested
+    class WhenHeartbeat {
+
+        @DisplayName("매장에 상관없이 모든 연결에 신호를 보낸다.")
+        @Test
+        void sendsToAllConnectionsAcrossStores() throws IOException {
+            // arrange
+            SseEmitter storeOne = mock(SseEmitter.class);
+            SseEmitter storeTwo = mock(SseEmitter.class);
+            registry.register(1L, storeOne);
+            registry.register(2L, storeTwo);
+
+            // act
+            registry.heartbeat();
+
+            // assert
+            verify(storeOne).send(any(SseEmitter.SseEventBuilder.class));
+            verify(storeTwo).send(any(SseEmitter.SseEventBuilder.class));
+        }
+
+        @DisplayName("쓰기에 실패한 죽은 연결은 레지스트리에서 정리한다.")
+        @Test
+        void removesDeadConnection() throws IOException {
+            // arrange
+            SseEmitter emitter = mock(SseEmitter.class);
+            doThrow(new IOException("broken pipe")).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+            registry.register(1L, emitter);
+
+            // act
+            registry.heartbeat();
+
+            // assert
+            assertThat(registry.connectionCount(1L)).isZero();
+        }
+
+        @DisplayName("연결이 하나도 없어도 예외가 발생하지 않는다.")
+        @Test
+        void doesNotThrowWhenNoConnections() {
+            // act & assert
+            assertThatCode(registry::heartbeat).doesNotThrowAnyException();
+        }
+    }
 }
