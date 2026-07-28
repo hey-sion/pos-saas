@@ -4,7 +4,7 @@ import com.sion.pos.application.order.OrderDeliveredEvent;
 
 public enum EventType {
 
-    ORDER_DELIVERED(OrderDeliveredEvent.class, "order-events");
+    ORDER_DELIVERED(OrderDeliveredEvent.class, Topics.ORDER_EVENTS);
 
     private final Class<? extends EventPayload> payloadClass;
     private final String topic;

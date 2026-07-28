@@ -32,4 +32,18 @@ public class EventSerializer {
             throw new PosApplicationException(ErrorType.INTERNAL_ERROR, "이벤트 역직렬화에 실패했습니다.");
         }
     }
+
+    public Event<EventPayload> toEvent(String eventType, String payloadJson) {
+        EventType type = EventType.valueOf(eventType);
+        EventPayload payload = deserializePayload(payloadJson, type.payloadClass());
+        return Event.of(payload.eventId(), type, payload);
+    }
+
+    private EventPayload deserializePayload(String json, Class<? extends EventPayload> payloadClass) {
+        try {
+            return objectMapper.readValue(json, payloadClass);
+        } catch (JsonProcessingException e) {
+            throw new PosApplicationException(ErrorType.INTERNAL_ERROR, "이벤트 역직렬화에 실패했습니다.");
+        }
+    }
 }
