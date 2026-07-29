@@ -9,6 +9,8 @@ COPY src ./src
 RUN ./gradlew clean bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre
+# 미설정 시 UTC — 앱이 남기는 시각이 DB(Asia/Seoul) 와 9시간 어긋남
+ENV TZ=Asia/Seoul
 WORKDIR /app
 
 COPY --from=build /app/build/libs/*.jar app.jar
