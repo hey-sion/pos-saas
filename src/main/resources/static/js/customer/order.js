@@ -17,6 +17,11 @@ const PENDING_TOAST_KEY = "pos:pendingToast";
 const PENDING_TOAST_TTL_MS = 2 * 60 * 1000;
 const TOAST_DURATION_MS = 4000;
 
+// PC(IFRAME)는 결제창이 닫히는 즉시 verify 해서 PG 상태 반영 전 PENDING 을 받는다.
+// 모바일(REDIRECTION)은 복귀 왕복 동안 시간이 벌려 대체로 한 번에 확정된다.
+const VERIFY_RETRY_COUNT = 3;
+const VERIFY_RETRY_DELAY_MS = 1000;
+
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("submitOrderButton").addEventListener("click", submitOrder);
     renderOrderBanner();
@@ -158,7 +163,7 @@ async function submitOrder() {
         const pgOk = await requestPortOne(created.pg, redirectUrl);
 
         try {
-            const verified = await verifyPayment(created.payment.id);
+            const verified = await verifyPaymentUntilSettled(created.payment.id);
             showVerifyResult(verified, order.orderNumber, pgOk);
         } catch {
             showToast(pgOk
@@ -269,6 +274,23 @@ async function verifyPayment(paymentId) {
     return response.json();
 }
 
+// PENDING 은 아직 확정 전이라는 뜻이라 잠시 뒤 다시 묻는다.
+// verify 는 PortOne 재조회 + 조건부 UPDATE 라 여러 번 불러도 한 번만 반영된다.
+async function verifyPaymentUntilSettled(paymentId) {
+    let verified = await verifyPayment(paymentId);
+
+    for (let attempt = 0; attempt < VERIFY_RETRY_COUNT && verified.status === "PENDING"; attempt++) {
+        await delay(VERIFY_RETRY_DELAY_MS);
+        verified = await verifyPayment(paymentId);
+    }
+
+    return verified;
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // 모바일 카카오페이는 REDIRECTION이라 결제 후 redirectUrl(?verifyPaymentId=…)로 복귀한다.
 // 그 시점에 우리 결제 ID로 서버 verify(PortOne 재조회 = 권위있는 상태)를 호출해 결과를 보여준다.
 async function handlePaymentReturn() {
@@ -282,7 +304,7 @@ async function handlePaymentReturn() {
     history.replaceState(null, "", location.pathname); // 새로고침 시 재검증 방지
 
     try {
-        const verified = await verifyPayment(verifyPaymentId);
+        const verified = await verifyPaymentUntilSettled(verifyPaymentId);
         showVerifyResult(verified, orderNumber);
     } catch {
         showToast("결제 확인에 실패했어요. 직원에게 문의해주세요");
