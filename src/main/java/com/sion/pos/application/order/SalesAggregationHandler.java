@@ -10,12 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SalesAggregationHandler {
 
+    private static final String CONSUMER = "sales-aggregation";
+
     private final ProcessedEventRepository processedEventRepository;
     private final StoreDailySalesRepository storeDailySalesRepository;
 
     @Transactional
     public void applySales(OrderDeliveredEvent event) {
-        int recorded = processedEventRepository.record(event.eventId());
+        int recorded = processedEventRepository.record(CONSUMER, event.eventId());
         if (recorded == 0) {
             return;
         }
