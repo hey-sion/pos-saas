@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.sion.pos.domain.order.StoreDailySales;
 import com.sion.pos.domain.order.StoreDailySalesRepository;
 import com.sion.pos.support.DatabaseCleanUp;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,15 +34,15 @@ class SalesAggregationHandlerIntegrationTest {
         void increasesDailySales() {
             // arrange
             Long storeId = 3L;
-            LocalDateTime occurredAt = LocalDateTime.of(2026, 7, 27, 14, 3);
-            OrderDeliveredEvent event = new OrderDeliveredEvent("evt-1", storeId, occurredAt, 9000);
+            LocalDate orderDate = LocalDate.of(2026, 7, 27);
+            OrderDeliveredEvent event = new OrderDeliveredEvent("evt-1", storeId, orderDate, orderDate.atTime(14, 3), 9000);
 
             // act
             salesAggregationHandler.applySales(event);
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
-                    .findByStoreIdAndSalesDate(storeId, occurredAt.toLocalDate())
+                    .findByStoreIdAndSalesDate(storeId, orderDate)
                     .orElseThrow();
             assertThat(sales.getSalesAmount()).isEqualTo(9000L);
             assertThat(sales.getOrderCount()).isEqualTo(1);
@@ -53,15 +53,15 @@ class SalesAggregationHandlerIntegrationTest {
         void accumulatesMultipleOrders() {
             // arrange
             Long storeId = 3L;
-            LocalDateTime occurredAt = LocalDateTime.of(2026, 7, 27, 14, 3);
+            LocalDate orderDate = LocalDate.of(2026, 7, 27);
 
             // act
-            salesAggregationHandler.applySales(new OrderDeliveredEvent("evt-1", storeId, occurredAt, 9000));
-            salesAggregationHandler.applySales(new OrderDeliveredEvent("evt-2", storeId, occurredAt, 5000));
+            salesAggregationHandler.applySales(new OrderDeliveredEvent("evt-1", storeId, orderDate, orderDate.atTime(14, 3), 9000));
+            salesAggregationHandler.applySales(new OrderDeliveredEvent("evt-2", storeId, orderDate, orderDate.atTime(14, 5), 5000));
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
-                    .findByStoreIdAndSalesDate(storeId, occurredAt.toLocalDate())
+                    .findByStoreIdAndSalesDate(storeId, orderDate)
                     .orElseThrow();
             assertThat(sales.getSalesAmount()).isEqualTo(14000L);
             assertThat(sales.getOrderCount()).isEqualTo(2);
@@ -72,8 +72,8 @@ class SalesAggregationHandlerIntegrationTest {
         void ignoresDuplicateEvent() {
             // arrange
             Long storeId = 3L;
-            LocalDateTime occurredAt = LocalDateTime.of(2026, 7, 27, 14, 3);
-            OrderDeliveredEvent event = new OrderDeliveredEvent("evt-1", storeId, occurredAt, 9000);
+            LocalDate orderDate = LocalDate.of(2026, 7, 27);
+            OrderDeliveredEvent event = new OrderDeliveredEvent("evt-1", storeId, orderDate, orderDate.atTime(14, 3), 9000);
 
             // act
             salesAggregationHandler.applySales(event);
@@ -81,7 +81,7 @@ class SalesAggregationHandlerIntegrationTest {
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
-                    .findByStoreIdAndSalesDate(storeId, occurredAt.toLocalDate())
+                    .findByStoreIdAndSalesDate(storeId, orderDate)
                     .orElseThrow();
             assertThat(sales.getSalesAmount()).isEqualTo(9000L);
             assertThat(sales.getOrderCount()).isEqualTo(1);

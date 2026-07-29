@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.sion.pos.application.order.OrderDeliveredEvent;
 import com.sion.pos.domain.event.OutboxRepository;
 import com.sion.pos.support.DatabaseCleanUp;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -62,7 +62,7 @@ class KafkaOutboxDispatcherTest {
         // arrange
         outboxEventPublisher.publish("ORDER_DELIVERED",
                 new OrderDeliveredEvent("ORDER_DELIVERED:3:2026-07-27:2", 3L,
-                        LocalDateTime.of(2026, 7, 27, 14, 3), 9000));
+                        LocalDate.of(2026, 7, 27), LocalDate.of(2026, 7, 27).atTime(14, 3), 9000));
 
         // act
         outboxRelay.relayPending();

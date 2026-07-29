@@ -3,7 +3,7 @@ package com.sion.pos.application.event;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sion.pos.application.order.OrderDeliveredEvent;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +19,8 @@ class EventSerializerTest {
     void preservesTypeAndPayloadThroughRoundTrip() {
         // arrange
         OrderDeliveredEvent payload = new OrderDeliveredEvent(
-                "ORDER_DELIVERED:3:2026-07-27:2", 3L, LocalDateTime.of(2026, 7, 27, 14, 3), 9000);
+                "ORDER_DELIVERED:3:2026-07-27:2", 3L,
+                LocalDate.of(2026, 7, 27), LocalDate.of(2026, 7, 27).atTime(14, 3), 9000);
         Event<OrderDeliveredEvent> event = Event.of(payload.eventId(), EventType.ORDER_DELIVERED, payload);
 
         // act

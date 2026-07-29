@@ -71,6 +71,7 @@ public class OrderService {
         return new OrderDeliveredEvent(
                 eventId,
                 order.getStoreId(),
+                order.getOrderDate(),
                 LocalDateTime.now(BUSINESS_ZONE),
                 order.getTotalAmount());
     }

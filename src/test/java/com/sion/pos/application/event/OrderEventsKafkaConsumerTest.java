@@ -8,7 +8,7 @@ import com.sion.pos.domain.order.StoreDailySales;
 import com.sion.pos.domain.order.StoreDailySalesRepository;
 import com.sion.pos.support.DatabaseCleanUp;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,9 +56,10 @@ class OrderEventsKafkaConsumerTest {
     @DisplayName("주문완료 봉투가 Kafka를 거쳐 소비되어 매출이 집계된다")
     void aggregatesThroughKafka() {
         // arrange
-        LocalDateTime occurredAt = LocalDateTime.of(2026, 7, 27, 14, 3);
+        LocalDate orderDate = LocalDate.of(2026, 7, 27);
         outboxEventPublisher.publish("ORDER_DELIVERED",
-                new OrderDeliveredEvent("ORDER_DELIVERED:3:2026-07-27:2", 3L, occurredAt, 9000));
+                new OrderDeliveredEvent("ORDER_DELIVERED:3:2026-07-27:2", 3L,
+                        orderDate, orderDate.atTime(14, 3), 9000));
 
         // act — 릴레이가 Kafka로 발행, 컨슈머가 비동기로 소비
         outboxRelay.relayPending();
@@ -66,7 +67,7 @@ class OrderEventsKafkaConsumerTest {
         // assert
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             StoreDailySales sales = storeDailySalesRepository
-                    .findByStoreIdAndSalesDate(3L, occurredAt.toLocalDate())
+                    .findByStoreIdAndSalesDate(3L, orderDate)
                     .orElseThrow();
             assertThat(sales.getSalesAmount()).isEqualTo(9000L);
         });

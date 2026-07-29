@@ -20,9 +20,10 @@ public class SalesAggregationHandler {
             return;
         }
 
+        // 자정을 넘겨 제공해도 주문일 기준 매출로 집계
         storeDailySalesRepository.addAmount(
                 event.storeId(),
-                event.occurredAt().toLocalDate(),
+                event.orderDate(),
                 event.totalAmount());
     }
 }

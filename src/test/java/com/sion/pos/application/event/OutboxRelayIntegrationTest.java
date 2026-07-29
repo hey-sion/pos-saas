@@ -8,7 +8,7 @@ import com.sion.pos.domain.event.OutboxRepository;
 import com.sion.pos.domain.order.StoreDailySales;
 import com.sion.pos.domain.order.StoreDailySalesRepository;
 import com.sion.pos.support.DatabaseCleanUp;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,16 +38,17 @@ class OutboxRelayIntegrationTest {
         @DisplayName("소비자가 처리해 매출이 집계되고 해당 행은 발행 처리된다")
         void processesAndMarksPublished() {
             // arrange
-            LocalDateTime occurredAt = LocalDateTime.of(2026, 7, 27, 14, 3);
+            LocalDate orderDate = LocalDate.of(2026, 7, 27);
             outboxEventPublisher.publish("ORDER_DELIVERED",
-                    new OrderDeliveredEvent("ORDER_DELIVERED:3:2026-07-27:2", 3L, occurredAt, 9000));
+                    new OrderDeliveredEvent("ORDER_DELIVERED:3:2026-07-27:2", 3L,
+                            orderDate, orderDate.atTime(14, 3), 9000));
 
             // act
             outboxRelay.relayPending();
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
-                    .findByStoreIdAndSalesDate(3L, occurredAt.toLocalDate())
+                    .findByStoreIdAndSalesDate(3L, orderDate)
                     .orElseThrow();
             assertThat(sales.getSalesAmount()).isEqualTo(9000L);
             Outbox row = outboxRepository.findAll().get(0);
@@ -58,9 +59,10 @@ class OutboxRelayIntegrationTest {
         @DisplayName("이미 발행된 행은 다시 처리하지 않아 매출이 한 번만 집계된다")
         void doesNotReprocessPublished() {
             // arrange
-            LocalDateTime occurredAt = LocalDateTime.of(2026, 7, 27, 14, 3);
+            LocalDate orderDate = LocalDate.of(2026, 7, 27);
             outboxEventPublisher.publish("ORDER_DELIVERED",
-                    new OrderDeliveredEvent("ORDER_DELIVERED:3:2026-07-27:2", 3L, occurredAt, 9000));
+                    new OrderDeliveredEvent("ORDER_DELIVERED:3:2026-07-27:2", 3L,
+                            orderDate, orderDate.atTime(14, 3), 9000));
 
             // act
             outboxRelay.relayPending();
@@ -68,7 +70,7 @@ class OutboxRelayIntegrationTest {
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
-                    .findByStoreIdAndSalesDate(3L, occurredAt.toLocalDate())
+                    .findByStoreIdAndSalesDate(3L, orderDate)
                     .orElseThrow();
             assertThat(sales.getSalesAmount()).isEqualTo(9000L);
         }

@@ -6,7 +6,7 @@ import com.sion.pos.application.order.OrderDeliveredEvent;
 import com.sion.pos.domain.event.Outbox;
 import com.sion.pos.domain.event.OutboxRepository;
 import com.sion.pos.support.DatabaseCleanUp;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +36,8 @@ class OutboxEventPublisherIntegrationTest {
         void savesPendingOutboxRow() {
             // arrange
             OrderDeliveredEvent event = new OrderDeliveredEvent(
-                    "ORDER_DELIVERED:3:2026-07-27:2", 3L, LocalDateTime.of(2026, 7, 27, 14, 3), 9000);
+                    "ORDER_DELIVERED:3:2026-07-27:2", 3L,
+                    LocalDate.of(2026, 7, 27), LocalDate.of(2026, 7, 27).atTime(14, 3), 9000);
 
             // act
             outboxEventPublisher.publish("ORDER_DELIVERED", event);
