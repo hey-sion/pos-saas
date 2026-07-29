@@ -1,6 +1,8 @@
 package com.sion.pos.domain.order;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -25,4 +27,6 @@ public interface StoreDailySalesRepository extends JpaRepository<StoreDailySales
                    @Param("amount") int amount);
 
     Optional<StoreDailySales> findByStoreIdAndSalesDate(Long storeId, LocalDate salesDate);
+
+    List<StoreDailySales> findByUpdatedAtAfter(LocalDateTime updatedAt);
 }

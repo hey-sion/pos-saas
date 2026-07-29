@@ -14,6 +14,7 @@ public class MySqlTestContainersConfig {
                         .withDatabaseName("pos_saas_test")
                         .withUsername("test")
                         .withPassword("test")
+                        .withEnv("TZ", "Asia/Seoul")
                         .withCommand(
                                 "--character-set-server=utf8mb4",
                                 "--collation-server=utf8mb4_unicode_ci"
