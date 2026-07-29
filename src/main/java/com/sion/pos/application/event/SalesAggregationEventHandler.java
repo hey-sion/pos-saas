@@ -1,15 +1,15 @@
 package com.sion.pos.application.event;
 
+import com.sion.pos.application.order.DailySalesUpdater;
 import com.sion.pos.application.order.OrderDeliveredEvent;
-import com.sion.pos.application.order.SalesAggregationHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class OrderDeliveredEventHandler implements EventHandler {
+public class SalesAggregationEventHandler implements EventHandler {
 
-    private final SalesAggregationHandler salesAggregationHandler;
+    private final DailySalesUpdater dailySalesUpdater;
 
     @Override
     public boolean supports(EventType type) {
@@ -18,6 +18,6 @@ public class OrderDeliveredEventHandler implements EventHandler {
 
     @Override
     public void handle(Event<? extends EventPayload> event) {
-        salesAggregationHandler.applySales((OrderDeliveredEvent) event.payload());
+        dailySalesUpdater.applySales((OrderDeliveredEvent) event.payload());
     }
 }

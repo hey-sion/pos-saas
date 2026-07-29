@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
-public class SalesAggregationHandler {
+public class DailySalesUpdater {
 
     private static final String CONSUMER = "sales-aggregation";
 

@@ -14,9 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class SalesAggregationHandlerIntegrationTest {
+class DailySalesUpdaterIntegrationTest {
 
-    @Autowired private SalesAggregationHandler salesAggregationHandler;
+    @Autowired private DailySalesUpdater dailySalesUpdater;
     @Autowired private StoreDailySalesRepository storeDailySalesRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
@@ -38,7 +38,7 @@ class SalesAggregationHandlerIntegrationTest {
             OrderDeliveredEvent event = new OrderDeliveredEvent("evt-1", storeId, orderDate, orderDate.atTime(14, 3), 9000);
 
             // act
-            salesAggregationHandler.applySales(event);
+            dailySalesUpdater.applySales(event);
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
@@ -56,8 +56,8 @@ class SalesAggregationHandlerIntegrationTest {
             LocalDate orderDate = LocalDate.of(2026, 7, 27);
 
             // act
-            salesAggregationHandler.applySales(new OrderDeliveredEvent("evt-1", storeId, orderDate, orderDate.atTime(14, 3), 9000));
-            salesAggregationHandler.applySales(new OrderDeliveredEvent("evt-2", storeId, orderDate, orderDate.atTime(14, 5), 5000));
+            dailySalesUpdater.applySales(new OrderDeliveredEvent("evt-1", storeId, orderDate, orderDate.atTime(14, 3), 9000));
+            dailySalesUpdater.applySales(new OrderDeliveredEvent("evt-2", storeId, orderDate, orderDate.atTime(14, 5), 5000));
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
@@ -76,8 +76,8 @@ class SalesAggregationHandlerIntegrationTest {
             OrderDeliveredEvent event = new OrderDeliveredEvent("evt-1", storeId, orderDate, orderDate.atTime(14, 3), 9000);
 
             // act
-            salesAggregationHandler.applySales(event);
-            salesAggregationHandler.applySales(event);
+            dailySalesUpdater.applySales(event);
+            dailySalesUpdater.applySales(event);
 
             // assert
             StoreDailySales sales = storeDailySalesRepository
