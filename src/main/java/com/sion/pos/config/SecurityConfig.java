@@ -40,6 +40,11 @@ public class SecurityConfig {
     /** 손님 약관/정책 화면. `/order/{slug}/policy/{type}` 만 공개. */
     private static final String CUSTOMER_POLICY_PATTERN = "/order/*/policy/*";
 
+    /* 본사 전용 경로. 매장 계정으로 들어오면 403 */
+    private static final String HQ_API_PATTERN = "/api/*/hq/**";
+    /* hasRole 은 ROLE_ 접두를 자동으로 붙이므로 접두를 뗀 이름을 준다. */
+    private static final String HQ_ROLE = "HQ";
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -57,6 +62,7 @@ public class SecurityConfig {
                         .requestMatchers(WEBHOOK_PATH, WEBHOOK_PATTERN).permitAll()
                         .requestMatchers(CUSTOMER_API_PATTERN, CUSTOMER_PAGE_PATTERN, CUSTOMER_POLICY_PATTERN).permitAll()
                         .requestMatchers("/login", "/css/**", "/js/**", "/favicon.ico", "/error").permitAll()
+                        .requestMatchers(HQ_API_PATTERN).hasRole(HQ_ROLE)
                         // default-deny: 공개 경로만 위에서 열고 나머지는 전부 인증 필요
                         .anyRequest().authenticated()
                 )
