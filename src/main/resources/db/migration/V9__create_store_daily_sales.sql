@@ -8,5 +8,6 @@ CREATE TABLE store_daily_sales (
     updated_at DATETIME(6) NOT NULL,
     deleted_at DATETIME(6),
     PRIMARY KEY (id),
-    UNIQUE KEY uk_store_daily_sales_store_date (store_id, sales_date)
+    UNIQUE KEY uk_store_daily_sales_store_date (store_id, sales_date),
+    KEY idx_store_daily_sales_updated_at (updated_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

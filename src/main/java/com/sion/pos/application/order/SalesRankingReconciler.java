@@ -7,6 +7,7 @@ import com.sion.pos.support.lock.DistributedLock;
 import com.sion.pos.support.time.BusinessTime;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,9 +52,14 @@ public class SalesRankingReconciler {
 
     /** 행마다 자기 날짜를 들고 있어 보정하는 쪽은 날짜를 몰라도 된다 — 자정 경계 예외 없음 */
     public void reconcileChangedSince(LocalDateTime since) {
-        for (StoreDailySales sales : storeDailySalesRepository.findByUpdatedAtAfter(since)) {
+        long startedAt = System.currentTimeMillis();
+
+        List<StoreDailySales> changed = storeDailySalesRepository.findByUpdatedAtAfter(since);
+        for (StoreDailySales sales : changed) {
             salesRankingRepository.replaceAmount(
                     sales.getSalesDate(), sales.getStoreId(), sales.getSalesAmount());
         }
+
+        log.info("매출 순위 보정 {}건, {}ms", changed.size(), System.currentTimeMillis() - startedAt);
     }
 }
