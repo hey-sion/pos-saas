@@ -25,6 +25,9 @@ public class Menu extends BaseEntity {
     @Column(nullable = false)
     private Integer price;
 
+    @Column(name = "daily_limit_quantity")
+    private Integer dailyLimitQuantity;
+
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
 
@@ -49,5 +52,17 @@ public class Menu extends BaseEntity {
         menu.sortOrder = sortOrder != null ? sortOrder : 0;
         menu.active = true;
         return menu;
+    }
+
+    public boolean hasDailyLimit() {
+        return dailyLimitQuantity != null;
+    }
+
+    public void changeDailyLimitQuantity(Integer dailyLimitQuantity) {
+        if (dailyLimitQuantity != null && dailyLimitQuantity <= 0) {
+            throw new PosApplicationException(ErrorType.BAD_REQUEST, "dailyLimitQuantity는 1 이상이어야 합니다.");
+        }
+
+        this.dailyLimitQuantity = dailyLimitQuantity;
     }
 }
