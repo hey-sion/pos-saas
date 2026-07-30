@@ -1,6 +1,8 @@
 package com.sion.pos.application.order;
 
 import com.sion.pos.application.event.OutboxEventPublisher;
+import com.sion.pos.application.menu.MenuStockRestoreLine;
+import com.sion.pos.application.menu.MenuStockService;
 import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
@@ -36,6 +38,7 @@ public class OrderService {
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final OutboxEventPublisher outboxEventPublisher;
+    private final MenuStockService menuStockService;
 
     @Transactional(readOnly = true)
     public Order getOrder(Long storeId, Long orderId) {
@@ -57,12 +60,23 @@ public class OrderService {
             case CANCELLED -> {
                 order.cancel();
                 invalidatePendingPgPayments(order.getId());
+                restoreLimitedStock(order);
             }
 
             case RECEIVED -> throw new PosApplicationException(ErrorType.BAD_REQUEST, "변경할 수 없는 주문 상태입니다.");
         }
 
         eventPublisher.publishEvent(new WaitingOrdersUpdatedEvent(storeId));
+    }
+
+    private void restoreLimitedStock(Order order) {
+        List<MenuStockRestoreLine> lines = orderItemRepository
+                .findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(order.getId()))
+                .stream()
+                .map(item -> new MenuStockRestoreLine(item.getMenuId(), item.getQuantity()))
+                .toList();
+
+        menuStockService.restore(order.getStoreId(), order.getOrderDate(), lines);
     }
 
     private OrderDeliveredEvent toOrderDeliveredEvent(Order order) {

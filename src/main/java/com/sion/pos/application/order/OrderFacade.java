@@ -1,5 +1,8 @@
 package com.sion.pos.application.order;
 
+import com.sion.pos.application.menu.MenuStockDeductLine;
+import com.sion.pos.application.menu.MenuStockRestoreLine;
+import com.sion.pos.application.menu.MenuStockService;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
@@ -32,6 +35,7 @@ public class OrderFacade {
     private final OrderService orderService;
     private final OrderNumberIssuer orderNumberIssuer;
     private final PaymentRepository paymentRepository;
+    private final MenuStockService menuStockService;
 
     @Transactional
     public Order createOrder(OrderCreateCommand command) {
@@ -48,6 +52,7 @@ public class OrderFacade {
         int totalAmount = calculateTotalAmount(command.items(), menuById);
 
         LocalDate orderDate = LocalDate.now(BUSINESS_ZONE);
+        menuStockService.deduct(command.storeId(), orderDate, toDeductLines(command.items(), menuById));
         int orderNumber = orderNumberIssuer.issue(command.storeId(), orderDate);
 
         Order order = orderRepository.save(Order.create(command.storeId(), orderDate, orderNumber, totalAmount));
@@ -94,6 +99,9 @@ public class OrderFacade {
         order.changeTotalAmount(calculateTotalAmount(command.items(), menuById));
 
         List<OrderItem> existingItems = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(order.getId()));
+        menuStockService.restore(storeId, order.getOrderDate(), toRestoreLines(existingItems));
+        menuStockService.deduct(storeId, order.getOrderDate(), toDeductLines(command.items(), menuById));
+
         existingItems.forEach(OrderItem::delete);
         orderItemRepository.saveAll(toOrderItems(order.getId(), command.items(), menuById));
 
@@ -119,6 +127,25 @@ public class OrderFacade {
         return lines.stream()
                     .mapToInt(line -> menuById.get(line.menuId()).getPrice() * line.quantity())
                     .sum();
+    }
+
+    private List<MenuStockDeductLine> toDeductLines(List<OrderItemLine> lines, Map<Long, Menu> menuById) {
+        return lines.stream()
+                    .filter(line -> menuById.get(line.menuId()).hasDailyLimit())
+                    .map(line -> {
+                        Menu menu = menuById.get(line.menuId());
+                        return new MenuStockDeductLine(
+                                menu.getId(),
+                                menu.getName(),
+                                menu.getDailyLimitQuantity(),
+                                line.quantity());
+                    }).toList();
+    }
+
+    private List<MenuStockRestoreLine> toRestoreLines(List<OrderItem> items) {
+        return items.stream()
+                    .map(item -> new MenuStockRestoreLine(item.getMenuId(), item.getQuantity()))
+                    .toList();
     }
 
     private List<OrderItem> toOrderItems(Long orderId, List<OrderItemLine> lines, Map<Long, Menu> menuById) {

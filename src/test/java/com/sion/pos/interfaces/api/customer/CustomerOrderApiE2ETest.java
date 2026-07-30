@@ -10,6 +10,7 @@ import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.store.Store;
 import com.sion.pos.domain.store.StoreRepository;
+import com.sion.pos.interfaces.api.ApiResponse;
 import com.sion.pos.interfaces.api.order.OrderCreateRequest;
 import com.sion.pos.interfaces.api.order.OrderCreateResponse;
 import com.sion.pos.interfaces.api.order.WaitingOrderResponse;
@@ -109,6 +110,31 @@ class CustomerOrderApiE2ETest {
                     endpoint(storeId), HttpMethod.POST, new HttpEntity<>(request), String.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @Test
+        @DisplayName("한정 수량이 모두 팔린 메뉴를 주문하면 409와 OUT_OF_STOCK 코드를 반환한다.")
+        void returnsOutOfStock_whenLimitedMenuSoldOut() {
+            // Arrange
+            int dailyLimit = 2;
+            Menu limited = Menu.create(storeId, "오늘의 디저트", 6_000, 3);
+            limited.changeDailyLimitQuantity(dailyLimit);
+            Long limitedMenuId = menuRepository.save(limited).getId();
+            createOrder(storeId, new OrderCreateRequest(List.of(
+                    new OrderCreateRequest.Line(limitedMenuId, dailyLimit))));
+
+            // Act
+            ResponseEntity<ApiResponse<Object>> response = ApiTestClient.plain(port).exchange(
+                    endpoint(storeId), HttpMethod.POST,
+                    new HttpEntity<>(new OrderCreateRequest(List.of(new OrderCreateRequest.Line(limitedMenuId, 1)))),
+                    new ParameterizedTypeReference<>() {});
+
+            // Assert
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                    () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("OUT_OF_STOCK"),
+                    () -> assertThat(orderRepository.findAll()).hasSize(1)
+            );
         }
 
         @Test
