@@ -1,20 +1,22 @@
 package com.sion.pos.interfaces.api.menu;
 
-import com.sion.pos.domain.menu.Menu;
+import com.sion.pos.application.menu.MenuInfo;
 
 public record MenuResponse(
         Long id,
         String name,
         Integer price,
-        Integer sortOrder
+        Integer sortOrder,
+        Integer remainingQuantity
 ) {
 
-    public static MenuResponse from(Menu menu) {
+    public static MenuResponse from(MenuInfo menu) {
         return new MenuResponse(
-                menu.getId(),
-                menu.getName(),
-                menu.getPrice(),
-                menu.getSortOrder()
+                menu.id(),
+                menu.name(),
+                menu.price(),
+                menu.sortOrder(),
+                menu.remainingQuantity()
         );
     }
 }
