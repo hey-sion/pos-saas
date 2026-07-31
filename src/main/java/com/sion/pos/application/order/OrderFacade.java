@@ -1,14 +1,11 @@
 package com.sion.pos.application.order;
 
-import com.sion.pos.application.menu.MenuStockDeductLine;
-import com.sion.pos.application.menu.MenuStockRestoreLine;
 import com.sion.pos.application.menu.MenuStockService;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
 import com.sion.pos.domain.order.OrderItem;
 import com.sion.pos.domain.order.OrderItemRepository;
-import com.sion.pos.domain.order.OrderRepository;
 import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.domain.payment.PaymentRepository;
 import com.sion.pos.support.error.ErrorType;
@@ -30,36 +27,20 @@ public class OrderFacade {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final MenuRepository menuRepository;
-    private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderService orderService;
     private final OrderNumberIssuer orderNumberIssuer;
+    private final OrderCreator orderCreator;
     private final PaymentRepository paymentRepository;
     private final MenuStockService menuStockService;
 
-    @Transactional
     public Order createOrder(OrderCreateCommand command) {
-        validateLines(command.items());
-
-        Map<Long, Menu> menuById = menuRepository
-                .findByIdInAndStoreIdAndActiveTrueAndDeletedAtIsNull(menuIds(command.items()), command.storeId())
-                .stream()
-                .collect(Collectors.toMap(Menu::getId, Function.identity()));
-        if (menuById.size() != command.items().size()) {
-            throw new PosApplicationException(ErrorType.NOT_FOUND, "주문할 수 없는 메뉴가 포함되어 있습니다.");
-        }
-
-        int totalAmount = calculateTotalAmount(command.items(), menuById);
+        OrderItemLines.validate(command.items());
 
         LocalDate orderDate = LocalDate.now(BUSINESS_ZONE);
-        menuStockService.deduct(command.storeId(), orderDate, toDeductLines(command.items(), menuById));
         int orderNumber = orderNumberIssuer.issue(command.storeId(), orderDate);
 
-        Order order = orderRepository.save(Order.create(command.storeId(), orderDate, orderNumber, totalAmount));
-
-        orderItemRepository.saveAll(toOrderItems(order.getId(), command.items(), menuById));
-
-        return order;
+        return orderCreator.create(orderNumber, orderDate, command);
     }
 
     @Transactional
@@ -72,7 +53,7 @@ public class OrderFacade {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "orderId는 1 이상이어야 합니다.");
         }
 
-        validateLines(command.items());
+        OrderItemLines.validate(command.items());
 
         Order order = orderService.getOrder(storeId, orderId);
         if (order.getStatus() != Order.Status.PAYMENT_PENDING) {
@@ -88,7 +69,7 @@ public class OrderFacade {
         }
 
         Map<Long, Menu> menuById = menuRepository
-                .findByIdInAndStoreIdAndActiveTrueAndDeletedAtIsNull(menuIds(command.items()), storeId)
+                .findByIdInAndStoreIdAndActiveTrueAndDeletedAtIsNull(OrderItemLines.menuIds(command.items()), storeId)
                 .stream()
                 .collect(Collectors.toMap(Menu::getId, Function.identity()));
         if (menuById.size() != command.items().size()) {
@@ -96,69 +77,16 @@ public class OrderFacade {
         }
 
         invalidatePendingPgPayments(payments);
-        order.changeTotalAmount(calculateTotalAmount(command.items(), menuById));
+        order.changeTotalAmount(OrderItemLines.totalAmount(command.items(), menuById));
 
         List<OrderItem> existingItems = orderItemRepository.findByOrderIdInAndDeletedAtIsNullOrderByIdAsc(List.of(order.getId()));
-        menuStockService.restore(storeId, order.getOrderDate(), toRestoreLines(existingItems));
-        menuStockService.deduct(storeId, order.getOrderDate(), toDeductLines(command.items(), menuById));
+        menuStockService.restore(storeId, order.getOrderDate(), OrderItemLines.toRestoreLines(existingItems));
+        menuStockService.deduct(storeId, order.getOrderDate(), OrderItemLines.toDeductLines(command.items(), menuById));
 
         existingItems.forEach(OrderItem::delete);
-        orderItemRepository.saveAll(toOrderItems(order.getId(), command.items(), menuById));
+        orderItemRepository.saveAll(OrderItemLines.toOrderItems(order.getId(), command.items(), menuById));
 
         return order;
-    }
-
-    private void validateLines(List<OrderItemLine> lines) {
-        if (lines == null || lines.isEmpty()) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "주문 항목이 비어 있습니다.");
-        }
-
-        List<Long> menuIds = menuIds(lines);
-        if (menuIds.stream().distinct().count() != menuIds.size()) {
-            throw new PosApplicationException(ErrorType.BAD_REQUEST, "중복된 메뉴가 포함되어 있습니다.");
-        }
-    }
-
-    private List<Long> menuIds(List<OrderItemLine> lines) {
-        return lines.stream().map(OrderItemLine::menuId).toList();
-    }
-
-    private int calculateTotalAmount(List<OrderItemLine> lines, Map<Long, Menu> menuById) {
-        return lines.stream()
-                    .mapToInt(line -> menuById.get(line.menuId()).getPrice() * line.quantity())
-                    .sum();
-    }
-
-    private List<MenuStockDeductLine> toDeductLines(List<OrderItemLine> lines, Map<Long, Menu> menuById) {
-        return lines.stream()
-                    .filter(line -> menuById.get(line.menuId()).hasDailyLimit())
-                    .map(line -> {
-                        Menu menu = menuById.get(line.menuId());
-                        return new MenuStockDeductLine(
-                                menu.getId(),
-                                menu.getName(),
-                                menu.getDailyLimitQuantity(),
-                                line.quantity());
-                    }).toList();
-    }
-
-    private List<MenuStockRestoreLine> toRestoreLines(List<OrderItem> items) {
-        return items.stream()
-                    .map(item -> new MenuStockRestoreLine(item.getMenuId(), item.getQuantity()))
-                    .toList();
-    }
-
-    private List<OrderItem> toOrderItems(Long orderId, List<OrderItemLine> lines, Map<Long, Menu> menuById) {
-        return lines.stream()
-                    .map(line -> {
-                        Menu menu = menuById.get(line.menuId());
-                        return OrderItem.create(
-                                orderId,
-                                menu.getId(),
-                                menu.getName(),
-                                menu.getPrice(),
-                                line.quantity());
-                    }).toList();
     }
 
     private void invalidatePendingPgPayments(List<Payment> payments) {

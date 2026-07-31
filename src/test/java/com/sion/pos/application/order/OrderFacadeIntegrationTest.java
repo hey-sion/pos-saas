@@ -128,6 +128,25 @@ class OrderFacadeIntegrationTest {
         }
 
         @Test
+        @DisplayName("주문 저장이 실패해도 이미 발급된 주문번호는 되돌아가지 않는다")
+        void keepsIssuedOrderNumberWhenOrderPersistenceFails() {
+            // Arrange
+            OrderCreateCommand failing = new OrderCreateCommand(
+                    storeId,
+                    List.of(new OrderItemLine(999_999L, 1)));
+            OrderCreateCommand valid = new OrderCreateCommand(
+                    storeId,
+                    List.of(new OrderItemLine(americanoId, 1)));
+
+            // Act
+            expects(ErrorType.NOT_FOUND, () -> orderFacade.createOrder(failing));
+            Order next = orderFacade.createOrder(valid);
+
+            // Assert
+            assertThat(next.getOrderNumber()).isEqualTo(2);
+        }
+
+        @Test
         @DisplayName("이전 날짜의 주문은 오늘의 orderNumber 채번에 영향이 없다")
         void previousDateOrderDoesNotAffectTodayNumber() {
             LocalDate yesterday = LocalDate.now().minusDays(1);

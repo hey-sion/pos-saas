@@ -7,7 +7,6 @@ import com.sion.pos.support.error.PosApplicationException;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -16,7 +15,7 @@ public class OrderNumberIssuer {
 
     private final OrderNumberSequenceRepository orderNumberSequenceRepository;
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional
     public int issue(Long storeId, LocalDate orderDate) {
         if (storeId == null) {
             throw new PosApplicationException(ErrorType.BAD_REQUEST, "storeId는 필수입니다.");
