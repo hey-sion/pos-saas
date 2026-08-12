@@ -3,6 +3,7 @@ package com.sion.pos.support.portone;
 import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
+import java.time.Duration;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -12,11 +13,15 @@ public record PortOneProperties(
         String apiSecret,
         String apiBaseUrl,
         String webhookSecret,
-        Map<String, ChannelKey> channelKeys
+        Map<String, ChannelKey> channelKeys,
+        Timeout timeout
 ) {
 
     /** provider별 테스트/실연동 채널 키. 실결제 여부는 매장(store.kakaoPayLive)이 결정한다. */
     public record ChannelKey(String test, String live) {}
+
+    /** PortOne API 호출 타임아웃. 기준은 손님이 결과를 기다리는 verify 경로 — docs/plan/payment-gateway-hardening.md STEP 1 */
+    public record Timeout(Duration connect, Duration read) {}
 
     public String channelKeyOf(Payment.Provider provider, boolean useLiveChannel) {
         if (provider == null) {

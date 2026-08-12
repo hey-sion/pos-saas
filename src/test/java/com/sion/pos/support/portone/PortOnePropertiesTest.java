@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.sion.pos.domain.payment.Payment;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
+import java.time.Duration;
 import java.util.Map;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
@@ -14,13 +15,17 @@ import org.junit.jupiter.api.Test;
 
 class PortOnePropertiesTest {
 
+    private static final PortOneProperties.Timeout TIMEOUT =
+            new PortOneProperties.Timeout(Duration.ofSeconds(2), Duration.ofSeconds(5));
+
     private static PortOneProperties propertiesWith(PortOneProperties.ChannelKey kakaoKey) {
         return new PortOneProperties(
                 "store-test",
                 "test-secret",
                 "https://api.portone.io",
                 "webhook-secret",
-                Map.of(Payment.Provider.KAKAO_PAY.name(), kakaoKey));
+                Map.of(Payment.Provider.KAKAO_PAY.name(), kakaoKey),
+                TIMEOUT);
     }
 
     @Nested
@@ -71,7 +76,7 @@ class PortOnePropertiesTest {
         @DisplayName("provider의 채널 설정이 아예 없으면 INTERNAL_ERROR 예외를 발생시킨다")
         void throwsInternalErrorWhenProviderNotConfigured() {
             PortOneProperties properties = new PortOneProperties(
-                    "store-test", "test-secret", "https://api.portone.io", "webhook-secret", Map.of());
+                    "store-test", "test-secret", "https://api.portone.io", "webhook-secret", Map.of(), TIMEOUT);
 
             expects(ErrorType.INTERNAL_ERROR, () -> properties.channelKeyOf(Payment.Provider.KAKAO_PAY, false));
         }

@@ -39,6 +39,9 @@ portone:
     KAKAO_PAY:
       test: ${PORTONE_CHANNEL_KEY_KAKAO_PAY:channel-key-test-kakao}
       live: ${PORTONE_CHANNEL_KEY_KAKAO_PAY_LIVE:}
+  timeout:
+    connect: ${PORTONE_CONNECT_TIMEOUT:500ms}
+    read: ${PORTONE_READ_TIMEOUT:500ms}
 
 logging:
   level:

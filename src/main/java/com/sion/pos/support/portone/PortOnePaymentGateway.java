@@ -4,28 +4,34 @@ import com.sion.pos.domain.payment.PaymentGateway;
 import com.sion.pos.domain.payment.PaymentGatewayResult;
 import com.sion.pos.support.error.ErrorType;
 import com.sion.pos.support.error.PosApplicationException;
-import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PortOnePaymentGateway implements PaymentGateway {
 
-    private final PortOneProperties properties;
-    private RestClient restClient;
+    private final RestClient restClient;
 
-    @PostConstruct
-    void init() {
-        this.restClient = RestClient.builder()
+    // RestClient.Builder 는 부트가 만들어준 빈을 받는다 — 정적 팩토리로 만들면 spring.http.client.* 설정이 적용되지 않는다.
+    public PortOnePaymentGateway(PortOneProperties properties, RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder
                 .baseUrl(properties.apiBaseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "PortOne " + properties.apiSecret())
+                .requestFactory(timeoutAppliedRequestFactory(properties.timeout()))
                 .build();
+    }
+
+    private static ClientHttpRequestFactory timeoutAppliedRequestFactory(PortOneProperties.Timeout timeout) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(timeout.connect());
+        requestFactory.setReadTimeout(timeout.read());
+        return requestFactory;
     }
 
     @Override
