@@ -214,6 +214,21 @@ class PaymentFacadeIntegrationTest {
         }
 
         @Test
+        @DisplayName("PG 조회를 트랜잭션 밖에서 수행한다")
+        void looksUpGatewayOutsideTransaction() {
+            // Arrange
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-abc", null));
+
+            // Act
+            paymentFacade.verify(storeId, created.paymentId());
+
+            // Assert
+            assertThat(fakePaymentGateway.wasTransactionActiveOnLastLookup()).isFalse();
+        }
+
+        @Test
         @DisplayName("PG 결제 검증이 완료되면 주문을 RECEIVED 상태로 변경한다")
         void marksOrderReceivedWhenPgPaymentVerified() {
             PaymentCreateInfo created = createPgPayment();
@@ -319,6 +334,21 @@ class PaymentFacadeIntegrationTest {
                     () -> assertThat(persisted.getPaidAt()).isNotNull(),
                     () -> assertThat(persisted.getPgTransactionKey()).isEqualTo("tx-webhook")
             );
+        }
+
+        @Test
+        @DisplayName("PG 조회를 트랜잭션 밖에서 수행한다")
+        void looksUpGatewayOutsideTransaction() {
+            // Arrange
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE, "tx-webhook", null));
+
+            // Act
+            paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId());
+
+            // Assert
+            assertThat(fakePaymentGateway.wasTransactionActiveOnLastLookup()).isFalse();
         }
 
         @Test

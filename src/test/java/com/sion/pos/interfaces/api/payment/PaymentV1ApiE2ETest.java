@@ -341,6 +341,21 @@ class PaymentV1ApiE2ETest {
         }
 
         @Test
+        @DisplayName("PG 조회가 실패하면 500을 반환해 PortOne 재시도를 유도한다.")
+        void returns500_whenGatewayLookupFails() {
+            // Arrange — 결제는 존재하지만 PG 조회 스텁이 없어 lookup 이 실패한다
+            PaymentCreateResponse created = createPgPayment();
+            String body = webhookJson("Transaction.Paid", created.pg().paymentId());
+
+            // Act
+            ResponseEntity<Void> response = testRestTemplate.exchange(WEBHOOK_ENDPOINT, HttpMethod.POST,
+                    new HttpEntity<>(body, signedHeaders(body)), Void.class);
+
+            // Assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        @Test
         @DisplayName("URL 끝에 슬래시가 붙어도 200 OK로 응답한다. (PortOne이 trailing slash를 붙임)")
         void returnsOk_whenTrailingSlash() {
             PaymentCreateResponse created = createPgPayment();

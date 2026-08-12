@@ -36,6 +36,7 @@ public class PaymentFacade {
     private final StoreRepository storeRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
+    private final PaymentResultApplier paymentResultApplier;
     private final PortOneProperties portOneProperties;
 
     @Transactional
@@ -91,7 +92,6 @@ public class PaymentFacade {
         return PaymentCreateInfo.offline(payment);
     }
 
-    @Transactional
     public PaymentVerifyInfo verify(Long storeId, Long paymentId) {
         return verifyPayment(getPayment(storeId, paymentId));
     }
@@ -99,7 +99,6 @@ public class PaymentFacade {
     /**
      * 손님 셀프결제용 결제 검증. 세션이 없어 storeId 스코프 없이 paymentId로 조회한다(공개 진입점).
      */
-    @Transactional
     public PaymentVerifyInfo verifyCustomerPayment(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                                            .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다."));
@@ -115,14 +114,14 @@ public class PaymentFacade {
             return PaymentVerifyInfo.from(payment);
         }
 
-        applyGatewayResult(payment);
+        PaymentGatewayResult result = paymentGateway.lookup(payment.getPgPaymentId());
+        paymentResultApplier.apply(payment.getId(), result);
 
         Payment refreshed = paymentRepository.findById(payment.getId())
                                              .orElseThrow(() -> new PosApplicationException(ErrorType.NOT_FOUND, "결제를 찾을 수 없습니다."));
         return PaymentVerifyInfo.from(refreshed);
     }
 
-    @Transactional
     public void handlePortOneWebhook(String type, String pgPaymentId) {
         if (!HANDLED_TYPES.contains(type)) {
             log.info("[PORTONE_WEBHOOK] ignored type={} pgPaymentId={}", type, pgPaymentId);
@@ -146,35 +145,8 @@ public class PaymentFacade {
             return;
         }
 
-        applyGatewayResult(payment);
-    }
-
-    private void applyGatewayResult(Payment payment) {
-        PaymentGatewayResult result = paymentGateway.lookup(payment.getPgPaymentId());
-
-        switch (result.status()) {
-            case PAID -> {
-                if (!payment.matchesAmount(result.amount())) {
-                    log.error("[AMOUNT_MISMATCH] paymentId={} expected={} actual={}", payment.getId(), payment.getAmount(), result.amount());
-                    return;
-                }
-
-                int completed = paymentRepository.completeIfPending(
-                        payment.getId(),
-                        LocalDateTime.now(BUSINESS_ZONE),
-                        result.transactionKey());
-                if (completed == 1) {
-                    Order order = orderRepository.findById(payment.getOrderId())
-                                                 .orElseThrow(() -> new PosApplicationException(
-                                                         ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
-                    order.markReceived();
-                }
-            }
-            case FAILED -> paymentRepository.failIfPending(payment.getId(), result.failReason());
-            case PENDING -> {
-                // PortOne 측에서도 아직 결제 완료 안 됨. PENDING 그대로 유지.
-            }
-        }
+        PaymentGatewayResult result = paymentGateway.lookup(pgPaymentId);
+        paymentResultApplier.apply(payment.getId(), result);
     }
 
     private Store getStore(Long storeId) {
