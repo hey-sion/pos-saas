@@ -22,12 +22,15 @@ const TOAST_DURATION_MS = 4000;
 const VERIFY_DEADLINE_MS = 3000;
 const VERIFY_RETRY_DELAY_MS = 1000;
 
+const SUBMIT_LABEL_DEFAULT = "주문하고 결제하기";
+const SUBMIT_LABEL_VERIFYING = "결제 확인 중이에요";
+
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("submitOrderButton").addEventListener("click", submitOrder);
     renderOrderBanner();
     loadMenus();
     renderCart();
-    handlePaymentReturn();
+    resumePaymentResult();
 });
 
 window.addEventListener("pageshow", () => showPendingToast());
@@ -113,7 +116,12 @@ function renderCart() {
     document.getElementById("cartCount").textContent = count;
     document.getElementById("cartTotal").textContent = formatPrice(total);
     document.getElementById("cartPreview").replaceChildren(...items.map(createCartChip));
-    document.getElementById("submitOrderButton").disabled = items.length === 0 || state.submitting;
+
+    // 미확정 주문이 남아 있으면 결제를 막는다 — 이미 결제됐을 수 있어 다시 누르면 이중청구가 된다.
+    const verifying = state.submitting || unsettledOrder() !== null;
+    const submitButton = document.getElementById("submitOrderButton");
+    submitButton.disabled = items.length === 0 || verifying;
+    submitButton.textContent = verifying ? SUBMIT_LABEL_VERIFYING : SUBMIT_LABEL_DEFAULT;
 }
 
 function createCartChip(item) {
@@ -156,14 +164,14 @@ async function submitOrder() {
             return;
         }
 
-        // 모바일(카카오페이 REDIRECTION)은 여기서 카카오로 이탈했다가 redirectUrl로 복귀 → 복귀 시 handlePaymentReturn에서 verify.
+        // 모바일(카카오페이 REDIRECTION)은 여기서 카카오로 이탈했다가 redirectUrl로 복귀 → 복귀 시 resumePaymentResult에서 verify.
         // PC(IFRAME)는 인라인 복귀라 아래 verify가 이어서 실행된다.
         // 복귀 경로는 현재 slug 기반 페이지 경로(location.pathname = /order/{slug})를 그대로 재사용한다.
         const redirectUrl = `${location.origin}${location.pathname}?verifyPaymentId=${created.payment.id}&orderNumber=${order.orderNumber}`;
         const pgOk = await requestPortOne(created.pg, redirectUrl);
 
         const verified = await verifyPaymentUntilSettled(created.payment.id);
-        showVerifyResult(verified, order.orderNumber, pgOk);
+        showVerifyResult(verified, {orderNumber: order.orderNumber, paymentId: created.payment.id, pgOk});
     } finally {
         state.submitting = false;
         renderCart();
@@ -171,9 +179,9 @@ async function submitOrder() {
 }
 
 // 모바일 리다이렉트 복귀와 PC 인라인 결제가 공유하는 결과 처리.
-// verified=null 은 마감시한까지 확정을 못 받은 미확정.
-// pgOk=false면 PG 자체가 안 떴다는 신호 — 미확정이어도 결제 진행 불가로 단정.
-function showVerifyResult(verified, orderNumber, pgOk = true) {
+// verified=null 은 마감시한까지 확정을 못 받은 미확정 — 결제가 됐을 수도 있는 상태다.
+// pgOk=false면 PG 자체가 안 떴다는 신호 — 돈이 안 나갔으므로 미확정으로 묶지 않는다.
+function showVerifyResult(verified, {orderNumber, paymentId, pgOk = true}) {
     if (verified?.status === "COMPLETED") {
         if (orderNumber) {
             saveLastOrder(orderNumber);
@@ -184,13 +192,34 @@ function showVerifyResult(verified, orderNumber, pgOk = true) {
             {replayOnResume: true}
         );
         resetCart();
-    } else if (verified?.status === "FAILED") {
-        showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
-    } else {
-        showToast(pgOk
-            ? "결제 확인 중이에요. 직원에게 문의해주세요"
-            : "결제를 진행할 수 없어요. 직원에게 문의해주세요");
+        return;
     }
+
+    if (verified?.status === "FAILED") {
+        clearUnsettledOrder(paymentId);
+        renderOrderBanner();
+        renderCart();
+        showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
+        return;
+    }
+
+    if (!pgOk) {
+        showToast("결제를 진행할 수 없어요. 직원에게 문의해주세요");
+        return;
+    }
+
+    // 주문번호는 결제 전에 이미 발급돼 있다. 손님과 직원을 잇는 유일한 열쇠라 여기서 꼭 보여준다.
+    if (orderNumber && paymentId) {
+        saveLastOrder(orderNumber, {paymentId, unsettled: true});
+        renderOrderBanner();
+        renderCart();
+    }
+    showToast(
+        orderNumber
+            ? `결제 확인 중이에요\n주문번호 #${orderNumber}번을 직원에게 알려주세요`
+            : "결제 확인 중이에요. 직원에게 문의해주세요",
+        {replayOnResume: true}
+    );
 }
 
 async function createOrder() {
@@ -223,7 +252,7 @@ async function createPayment(orderId) {
 }
 
 // PG 호출 성공 여부를 반환 — 결제창이 못 떴거나 SDK가 code 달린 결과 돌려주면 false.
-// 모바일은 redirect로 떠나가서 resolve가 안 되니 호출자가 결과를 보지 않음(handlePaymentReturn 흐름).
+// 모바일은 redirect로 떠나가서 resolve가 안 되니 호출자가 결과를 보지 않음(resumePaymentResult 흐름).
 async function requestPortOne(pg, redirectUrl) {
     if (typeof PortOne === "undefined" || !PortOne.requestPayment) {
         return false;
@@ -298,19 +327,41 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 모바일 카카오페이는 REDIRECTION이라 결제 후 redirectUrl(?verifyPaymentId=…)로 복귀한다.
-// 그 시점에 우리 결제 ID로 서버 verify(PortOne 재조회 = 권위있는 상태)를 호출해 결과를 보여준다.
-async function handlePaymentReturn() {
+// 페이지 진입 시 결제 결과를 화면에 반영하는 진입점.
+// ① 모바일 카카오페이는 REDIRECTION이라 결제 후 redirectUrl(?verifyPaymentId=…)로 복귀한다.
+// ② 복귀가 아니어도 미확정으로 남은 주문이 있으면 다시 묻는다 — 그 사이 웹훅이 서버에서 확정했을 수 있다.
+async function resumePaymentResult() {
     const params = new URLSearchParams(location.search);
-    const verifyPaymentId = params.get("verifyPaymentId");
-    if (!verifyPaymentId) {
+    const returnedPaymentId = params.get("verifyPaymentId");
+
+    if (returnedPaymentId) {
+        const orderNumber = params.get("orderNumber");
+        history.replaceState(null, "", location.pathname); // 새로고침 시 재검증 방지
+
+        const verified = await verifyPaymentUntilSettled(returnedPaymentId);
+        showVerifyResult(verified, {orderNumber, paymentId: returnedPaymentId});
         return;
     }
 
-    const orderNumber = params.get("orderNumber");
-    history.replaceState(null, "", location.pathname); // 새로고침 시 재검증 방지
+    await recheckUnsettledOrder();
+}
 
-    showVerifyResult(await verifyPaymentUntilSettled(verifyPaymentId), orderNumber);
+// 손님이 기다리는 상황이 아니라 한 번만 조용히 묻는다.
+// 아직도 미확정이면 화면을 그대로 둔다 — 같은 안내를 재진입마다 반복하지 않는다.
+async function recheckUnsettledOrder() {
+    const unsettled = unsettledOrder();
+    if (!unsettled) {
+        return;
+    }
+
+    try {
+        const verified = await verifyPayment(unsettled.paymentId);
+        if (verified.status !== "PENDING") {
+            showVerifyResult(verified, {orderNumber: unsettled.orderNumber, paymentId: unsettled.paymentId});
+        }
+    } catch {
+        // 여전히 미확정 — 배너와 결제 잠금을 유지한다.
+    }
 }
 
 function restorePageVisibility() {
@@ -319,15 +370,31 @@ function restorePageVisibility() {
 
 // 최근 주문을 localStorage에 저장 — 페이지 새로고침/재진입 시에도 자기 주문번호 확인 가능.
 // 매장 분리: storeId까지 같이 저장해서 다른 매장 QR로 진입 시 보이지 않게.
-function saveLastOrder(orderNumber) {
+function saveLastOrder(orderNumber, {paymentId = null, unsettled = false} = {}) {
     try {
         localStorage.setItem(LAST_ORDER_KEY, JSON.stringify({
             storeId,
             orderNumber: Number(orderNumber),
+            paymentId,
+            unsettled,
             ts: Date.now()
         }));
     } catch {
         // localStorage 접근 불가(시크릿 모드/용량초과 등) — 배너 미동작 허용.
+    }
+}
+
+// 해당 결제의 미확정 기록만 지운다. 그 전에 성공한 주문의 배너까지 날리지 않기 위해 paymentId 로 대조한다.
+function clearUnsettledOrder(paymentId) {
+    const last = readLastOrder();
+    if (!last?.unsettled || last.paymentId !== paymentId) {
+        return;
+    }
+
+    try {
+        localStorage.removeItem(LAST_ORDER_KEY);
+    } catch {
+        // localStorage 접근 불가 허용
     }
 }
 
@@ -393,15 +460,23 @@ function readLastOrder() {
     }
 }
 
+function unsettledOrder() {
+    const last = readLastOrder();
+    return last?.unsettled ? last : null;
+}
+
 function renderOrderBanner() {
     const section = document.getElementById("orderBannerSection");
     const numberEl = document.getElementById("orderBannerNumber");
+    const labelEl = document.getElementById("orderBannerLabel");
     const last = readLastOrder();
     if (!last) {
         section.hidden = true;
         return;
     }
     numberEl.textContent = String(last.orderNumber);
+    labelEl.textContent = last.unsettled ? "결제 확인 중" : "내 주문번호";
+    section.classList.toggle("unsettled", last.unsettled === true);
     section.hidden = false;
 }
 

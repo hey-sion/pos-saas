@@ -414,6 +414,15 @@
             font-weight: 900;
         }
 
+        .order-pill.unsettled {
+            border-color: var(--yellow-500);
+            background: var(--yellow-50);
+        }
+
+        .order-pill.unsettled .order-pill-number {
+            color: var(--gray-900);
+        }
+
         .biz-footer {
             width: min(100%, 960px);
             margin: 0 auto;
@@ -484,7 +493,7 @@
             <h1 class="store-name" id="storeName" th:text="${storeName}">매장명</h1>
         </div>
         <aside class="order-pill" id="orderBannerSection" hidden aria-label="내 최근 주문" aria-live="polite">
-            <span class="order-pill-label">내 주문번호</span>
+            <span class="order-pill-label" id="orderBannerLabel">내 주문번호</span>
             <strong class="order-pill-number">#<span id="orderBannerNumber"></span></strong>
         </aside>
     </header>
