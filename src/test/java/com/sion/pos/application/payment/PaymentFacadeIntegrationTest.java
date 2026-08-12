@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.sion.pos.application.order.OrderCreateCommand;
 import com.sion.pos.application.order.OrderFacade;
 import com.sion.pos.application.order.OrderItemLine;
+import com.sion.pos.application.order.OrderService;
 import com.sion.pos.domain.menu.Menu;
 import com.sion.pos.domain.menu.MenuRepository;
 import com.sion.pos.domain.order.Order;
@@ -41,6 +42,7 @@ class PaymentFacadeIntegrationTest {
 
     @Autowired private PaymentFacade paymentFacade;
     @Autowired private OrderFacade orderFacade;
+    @Autowired private OrderService orderService;
     @Autowired private StoreRepository storeRepository;
     @Autowired private MenuRepository menuRepository;
     @Autowired private OrderRepository orderRepository;
@@ -290,20 +292,39 @@ class PaymentFacadeIntegrationTest {
         }
 
         @Test
-        @DisplayName("결제 금액이 일치하지 않으면 PENDING 상태를 유지한다")
-        void keepsPendingWhenAmountMismatched() {
+        @DisplayName("결제 금액이 일치하지 않으면 AMOUNT_MISMATCH로 격리한다")
+        void marksAmountMismatchWhenAmountMismatched() {
+            // Arrange
             PaymentCreateInfo created = createPgPayment();
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE + 1_000, "tx-abc", null));
 
+            // Act
             assertThatCode(() -> paymentFacade.verify(storeId, created.paymentId())).doesNotThrowAnyException();
 
+            // Assert
             Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
             assertAll(
-                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.PENDING),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.AMOUNT_MISMATCH),
                     () -> assertThat(persisted.getPaidAt()).isNull(),
                     () -> assertThat(persisted.getPgTransactionKey()).isNull()
             );
+        }
+
+        @Test
+        @DisplayName("결제 금액이 일치하지 않으면 주문을 결제 대기 상태로 유지한다")
+        void keepsOrderPaymentPendingWhenAmountMismatched() {
+            // Arrange
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE + 1_000, "tx-abc", null));
+
+            // Act
+            paymentFacade.verify(storeId, created.paymentId());
+
+            // Assert
+            Order order = orderRepository.findById(created.orderId()).orElseThrow();
+            assertThat(order.getStatus()).isEqualTo(Order.Status.PAYMENT_PENDING);
         }
 
         @Test
@@ -429,20 +450,50 @@ class PaymentFacadeIntegrationTest {
         }
 
         @Test
-        @DisplayName("결제 금액이 일치하지 않으면 PENDING을 유지한다")
-        void keepsPendingWhenAmountMismatched() {
+        @DisplayName("결제 금액이 일치하지 않으면 AMOUNT_MISMATCH로 격리한다")
+        void marksAmountMismatchWhenAmountMismatched() {
+            // Arrange
             PaymentCreateInfo created = createPgPayment();
             fakePaymentGateway.stub(created.pg().paymentId(),
                     new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE + 1_000, "tx-abc", null));
 
+            // Act
             assertThatCode(() -> paymentFacade.handlePortOneWebhook("Transaction.Paid", created.pg().paymentId()))
                     .doesNotThrowAnyException();
 
+            // Assert
             Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
             assertAll(
-                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.PENDING),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.AMOUNT_MISMATCH),
                     () -> assertThat(persisted.getPaidAt()).isNull(),
                     () -> assertThat(persisted.getPgTransactionKey()).isNull()
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("금액 불일치로 격리된 결제가 있을 때, ")
+    class AmountMismatched {
+
+        @Test
+        @DisplayName("주문을 취소해도 결제는 AMOUNT_MISMATCH로 남는다")
+        void keepsAmountMismatchWhenOrderCancelled() {
+            // Arrange
+            PaymentCreateInfo created = createPgPayment();
+            fakePaymentGateway.stub(created.pg().paymentId(),
+                    new PaymentGatewayResult(PaymentGatewayResult.Status.PAID, AMERICANO_PRICE + 1_000, "tx-abc", null));
+            paymentFacade.verify(storeId, created.paymentId());
+
+            // Act
+            orderService.updateStatus(storeId, created.orderId(), Order.Status.CANCELLED);
+
+            // Assert
+            Payment persisted = paymentRepository.findById(created.paymentId()).orElseThrow();
+            Order order = orderRepository.findById(created.orderId()).orElseThrow();
+            assertAll(
+                    () -> assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED),
+                    () -> assertThat(persisted.getStatus()).isEqualTo(Payment.Status.AMOUNT_MISMATCH),
+                    () -> assertThat(persisted.getFailReason()).isNull()
             );
         }
     }

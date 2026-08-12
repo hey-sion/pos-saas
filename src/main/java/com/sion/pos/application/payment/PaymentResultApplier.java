@@ -33,6 +33,7 @@ public class PaymentResultApplier {
             case PAID -> {
                 if (!payment.matchesAmount(result.amount())) {
                     log.error("[AMOUNT_MISMATCH] paymentId={} expected={} actual={}", payment.getId(), payment.getAmount(), result.amount());
+                    paymentRepository.markMismatchIfPending(payment.getId());
                     return;
                 }
 

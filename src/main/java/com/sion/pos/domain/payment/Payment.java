@@ -146,7 +146,9 @@ public class Payment extends BaseEntity {
     public enum Status {
         PENDING,
         COMPLETED,
-        FAILED
+        FAILED,
+        // PG는 결제 완료인데 금액이 우리 주문과 다른 상태. 사람이 확인해야 하므로 자동 로직이 건드리지 않게 PENDING에서 분리
+        AMOUNT_MISMATCH
     }
 
     public enum Method {

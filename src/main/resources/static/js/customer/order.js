@@ -23,7 +23,12 @@ const VERIFY_DEADLINE_MS = 3000;
 const VERIFY_RETRY_DELAY_MS = 1000;
 
 const SUBMIT_LABEL_DEFAULT = "주문하고 결제하기";
-const SUBMIT_LABEL_VERIFYING = "결제 확인 중이에요";
+const SUBMIT_LABEL_VERIFYING = "결제 확인 중이에요";   // 실제로 확인이 도는 동안 (최대 VERIFY_DEADLINE_MS)
+const SUBMIT_LABEL_NEEDS_CHECK = "결제 확인 필요";     // 닫히지 않은 주문 때문에 잠김
+
+// 결제가 닫히지 않은 주문의 두 갈래. 화면과 잠금은 같고, 자동 재확인 대상만 UNSETTLED 로 한정한다.
+const ORDER_STATE_UNSETTLED = "UNSETTLED";      // 결과를 못 받음 — 웹훅이 확정하면 풀린다
+const ORDER_STATE_NEEDS_STAFF = "NEEDS_STAFF";  // 서버가 확정 불가로 판정 — 다시 물어도 안 바뀐다
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("submitOrderButton").addEventListener("click", submitOrder);
@@ -117,11 +122,18 @@ function renderCart() {
     document.getElementById("cartTotal").textContent = formatPrice(total);
     document.getElementById("cartPreview").replaceChildren(...items.map(createCartChip));
 
-    // 미확정 주문이 남아 있으면 결제를 막는다 — 이미 결제됐을 수 있어 다시 누르면 이중청구가 된다.
-    const verifying = state.submitting || unsettledOrder() !== null;
+    // 닫히지 않은 주문이 남아 있으면 결제를 막는다 — 이미 결제됐을 수 있어 다시 누르면 이중청구가 된다.
+    const openOrder = unsettledOrder();
     const submitButton = document.getElementById("submitOrderButton");
-    submitButton.disabled = items.length === 0 || verifying;
-    submitButton.textContent = verifying ? SUBMIT_LABEL_VERIFYING : SUBMIT_LABEL_DEFAULT;
+    submitButton.disabled = items.length === 0 || state.submitting || openOrder !== null;
+    submitButton.textContent = submitButtonLabel(openOrder);
+}
+
+function submitButtonLabel(openOrder) {
+    if (state.submitting) {
+        return SUBMIT_LABEL_VERIFYING;
+    }
+    return openOrder ? SUBMIT_LABEL_NEEDS_CHECK : SUBMIT_LABEL_DEFAULT;
 }
 
 function createCartChip(item) {
@@ -203,23 +215,38 @@ function showVerifyResult(verified, {orderNumber, paymentId, pgOk = true}) {
         return;
     }
 
+    // AMOUNT_MISMATCH 는 PG 에 결제가 남아 있다는 서버 판정이라 pgOk 힌트보다 우선한다.
+    if (verified?.status === "AMOUNT_MISMATCH") {
+        keepOrderOpen(orderNumber, paymentId, ORDER_STATE_NEEDS_STAFF);
+        showToast(staffCheckMessage(orderNumber), {replayOnResume: true});
+        return;
+    }
+
     if (!pgOk) {
         showToast("결제를 진행할 수 없어요. 직원에게 문의해주세요");
         return;
     }
 
-    // 주문번호는 결제 전에 이미 발급돼 있다. 손님과 직원을 잇는 유일한 열쇠라 여기서 꼭 보여준다.
-    if (orderNumber && paymentId) {
-        saveLastOrder(orderNumber, {paymentId, unsettled: true});
-        renderOrderBanner();
-        renderCart();
+    keepOrderOpen(orderNumber, paymentId, ORDER_STATE_UNSETTLED);
+    showToast(staffCheckMessage(orderNumber), {replayOnResume: true});
+}
+
+// 주문번호는 결제 전에 이미 발급돼 있다. 손님과 직원을 잇는 유일한 열쇠라 화면에 남기고, 그동안 재결제를 막는다.
+function keepOrderOpen(orderNumber, paymentId, state) {
+    if (!orderNumber || !paymentId) {
+        return;
     }
-    showToast(
-        orderNumber
-            ? `결제 확인 중이에요\n주문번호 #${orderNumber}번을 직원에게 알려주세요`
-            : "결제 확인 중이에요. 직원에게 문의해주세요",
-        {replayOnResume: true}
-    );
+
+    saveLastOrder(orderNumber, {paymentId, state});
+    renderOrderBanner();
+    renderCart();
+}
+
+// 두 상태 모두 손님이 할 일은 같다 — 주문번호를 직원에게 알리는 것. 화면에서 저절로 풀리지도 않는다.
+function staffCheckMessage(orderNumber) {
+    return orderNumber
+            ? `결제 확인이 필요해요\n주문번호 #${orderNumber}번을 직원에게 알려주세요`
+            : "결제 확인이 필요해요. 직원에게 문의해주세요";
 }
 
 async function createOrder() {
@@ -348,9 +375,10 @@ async function resumePaymentResult() {
 
 // 손님이 기다리는 상황이 아니라 한 번만 조용히 묻는다.
 // 아직도 미확정이면 화면을 그대로 둔다 — 같은 안내를 재진입마다 반복하지 않는다.
+// NEEDS_STAFF 는 서버가 이미 확정 불가로 판정한 상태라 다시 물어도 바뀌지 않으므로 건너뛴다.
 async function recheckUnsettledOrder() {
     const unsettled = unsettledOrder();
-    if (!unsettled) {
+    if (unsettled?.state !== ORDER_STATE_UNSETTLED) {
         return;
     }
 
@@ -370,13 +398,13 @@ function restorePageVisibility() {
 
 // 최근 주문을 localStorage에 저장 — 페이지 새로고침/재진입 시에도 자기 주문번호 확인 가능.
 // 매장 분리: storeId까지 같이 저장해서 다른 매장 QR로 진입 시 보이지 않게.
-function saveLastOrder(orderNumber, {paymentId = null, unsettled = false} = {}) {
+function saveLastOrder(orderNumber, {paymentId = null, state = null} = {}) {
     try {
         localStorage.setItem(LAST_ORDER_KEY, JSON.stringify({
             storeId,
             orderNumber: Number(orderNumber),
             paymentId,
-            unsettled,
+            state,
             ts: Date.now()
         }));
     } catch {
@@ -387,7 +415,7 @@ function saveLastOrder(orderNumber, {paymentId = null, unsettled = false} = {}) 
 // 해당 결제의 미확정 기록만 지운다. 그 전에 성공한 주문의 배너까지 날리지 않기 위해 paymentId 로 대조한다.
 function clearUnsettledOrder(paymentId) {
     const last = readLastOrder();
-    if (!last?.unsettled || last.paymentId !== paymentId) {
+    if (!last?.state || last.paymentId !== paymentId) {
         return;
     }
 
@@ -462,7 +490,7 @@ function readLastOrder() {
 
 function unsettledOrder() {
     const last = readLastOrder();
-    return last?.unsettled ? last : null;
+    return last?.state ? last : null;
 }
 
 function renderOrderBanner() {
@@ -475,8 +503,8 @@ function renderOrderBanner() {
         return;
     }
     numberEl.textContent = String(last.orderNumber);
-    labelEl.textContent = last.unsettled ? "결제 확인 중" : "내 주문번호";
-    section.classList.toggle("unsettled", last.unsettled === true);
+    labelEl.textContent = last.state ? "결제 확인 필요" : "내 주문번호";
+    section.classList.toggle("attention", Boolean(last.state));
     section.hidden = false;
 }
 

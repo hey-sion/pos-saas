@@ -48,4 +48,14 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
                AND status = 'PENDING'
             """, nativeQuery = true)
     int failIfPending(@Param("id") Long id, @Param("reason") String reason);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE payment
+               SET status = 'AMOUNT_MISMATCH',
+                   updated_at = CURRENT_TIMESTAMP(6)
+             WHERE id = :id
+               AND status = 'PENDING'
+            """, nativeQuery = true)
+    int markMismatchIfPending(@Param("id") Long id);
 }
