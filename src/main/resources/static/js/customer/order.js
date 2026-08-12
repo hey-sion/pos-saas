@@ -19,7 +19,7 @@ const TOAST_DURATION_MS = 4000;
 
 // PC(IFRAME)는 결제창이 닫히는 즉시 verify 해서 PG 상태 반영 전 PENDING 을 받는다.
 // 모바일(REDIRECTION)은 복귀 왕복 동안 시간이 벌려 대체로 한 번에 확정된다.
-const VERIFY_RETRY_COUNT = 3;
+const VERIFY_DEADLINE_MS = 3000;
 const VERIFY_RETRY_DELAY_MS = 1000;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -162,14 +162,8 @@ async function submitOrder() {
         const redirectUrl = `${location.origin}${location.pathname}?verifyPaymentId=${created.payment.id}&orderNumber=${order.orderNumber}`;
         const pgOk = await requestPortOne(created.pg, redirectUrl);
 
-        try {
-            const verified = await verifyPaymentUntilSettled(created.payment.id);
-            showVerifyResult(verified, order.orderNumber, pgOk);
-        } catch {
-            showToast(pgOk
-                ? "결제 확인에 실패했어요. 직원에게 문의해주세요"
-                : "결제를 진행할 수 없어요. 직원에게 문의해주세요");
-        }
+        const verified = await verifyPaymentUntilSettled(created.payment.id);
+        showVerifyResult(verified, order.orderNumber, pgOk);
     } finally {
         state.submitting = false;
         renderCart();
@@ -177,9 +171,10 @@ async function submitOrder() {
 }
 
 // 모바일 리다이렉트 복귀와 PC 인라인 결제가 공유하는 결과 처리.
-// pgOk=false면 PG 자체가 안 떴다는 신호 — PENDING이어도 결제 진행 불가로 단정.
+// verified=null 은 마감시한까지 확정을 못 받은 미확정.
+// pgOk=false면 PG 자체가 안 떴다는 신호 — 미확정이어도 결제 진행 불가로 단정.
 function showVerifyResult(verified, orderNumber, pgOk = true) {
-    if (verified.status === "COMPLETED") {
+    if (verified?.status === "COMPLETED") {
         if (orderNumber) {
             saveLastOrder(orderNumber);
             renderOrderBanner();
@@ -189,11 +184,11 @@ function showVerifyResult(verified, orderNumber, pgOk = true) {
             {replayOnResume: true}
         );
         resetCart();
-    } else if (verified.status === "FAILED") {
+    } else if (verified?.status === "FAILED") {
         showToast(verified.failReason ? `결제 실패: ${verified.failReason}` : "결제가 취소됐어요");
     } else {
         showToast(pgOk
-            ? "결제 확인 중이에요. 잠시 후 다시 시도해주세요"
+            ? "결제 확인 중이에요. 직원에게 문의해주세요"
             : "결제를 진행할 수 없어요. 직원에게 문의해주세요");
     }
 }
@@ -274,17 +269,29 @@ async function verifyPayment(paymentId) {
     return response.json();
 }
 
-// PENDING 은 아직 확정 전이라는 뜻이라 잠시 뒤 다시 묻는다.
-// verify 는 PortOne 재조회 + 조건부 UPDATE 라 여러 번 불러도 한 번만 반영된다.
+// PENDING 도 HTTP 실패도 손님 입장에선 똑같이 "아직 모름" 이라 같은 재시도 대상으로 둔다.
+// verify 는 PortOne 재조회 + 조건부 UPDATE 라 여러 번 불러도 한 번만 반영되고,
+// 이미 확정된 결제는 PG 재조회 없이 DB 만 읽고 응답한다.
+// 마감시한까지 확정을 못 받으면 null — 호출부가 미확정으로 처리한다.
 async function verifyPaymentUntilSettled(paymentId) {
-    let verified = await verifyPayment(paymentId);
+    const deadline = Date.now() + VERIFY_DEADLINE_MS;
 
-    for (let attempt = 0; attempt < VERIFY_RETRY_COUNT && verified.status === "PENDING"; attempt++) {
-        await delay(VERIFY_RETRY_DELAY_MS);
-        verified = await verifyPayment(paymentId);
+    while (true) {
+        try {
+            const verified = await verifyPayment(paymentId);
+            if (verified.status !== "PENDING") {
+                return verified;
+            }
+        } catch {
+            // 마감시한 안이면 다시 묻는다.
+        }
+
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) {
+            return null;
+        }
+        await delay(Math.min(VERIFY_RETRY_DELAY_MS, remaining));
     }
-
-    return verified;
 }
 
 function delay(ms) {
@@ -303,12 +310,7 @@ async function handlePaymentReturn() {
     const orderNumber = params.get("orderNumber");
     history.replaceState(null, "", location.pathname); // 새로고침 시 재검증 방지
 
-    try {
-        const verified = await verifyPaymentUntilSettled(verifyPaymentId);
-        showVerifyResult(verified, orderNumber);
-    } catch {
-        showToast("결제 확인에 실패했어요. 직원에게 문의해주세요");
-    }
+    showVerifyResult(await verifyPaymentUntilSettled(verifyPaymentId), orderNumber);
 }
 
 function restorePageVisibility() {
