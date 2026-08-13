@@ -30,6 +30,17 @@ security:
     key: ${REMEMBER_ME_KEY:local-dev-remember-me-key}
     validity-seconds: ${REMEMBER_ME_VALIDITY_SECONDS:2592000}
 
+# 주기 작업은 기본 꺼짐. 운영 .env 에 SCHEDULING_ENABLED=true 를 명시해야 돈다.
+scheduling:
+  enabled: ${SCHEDULING_ENABLED:false}
+
+payment:
+  reconcile:
+    delay: ${PAYMENT_RECONCILE_DELAY:1m}
+    grace: ${PAYMENT_RECONCILE_GRACE:3m}
+    lookback: ${PAYMENT_RECONCILE_LOOKBACK:30m}
+    batch-size: ${PAYMENT_RECONCILE_BATCH_SIZE:50}
+
 portone:
   store-id: ${PORTONE_STORE_ID:store-test}
   api-secret: ${PORTONE_API_SECRET:test-secret}

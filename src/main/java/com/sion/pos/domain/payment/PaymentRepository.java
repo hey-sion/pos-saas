@@ -23,6 +23,21 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             """, nativeQuery = true)
     Optional<Payment> findByIdAndOrderStoreId(@Param("id") Long id, @Param("storeId") Long storeId);
 
+    /** 재조회 배치 대상. 웹훅이 도착할 시간을 주고(createdBefore), 밀린 건을 한 번에 긁지 않도록 창과 건수를 제한한다. */
+    @Query(value = """
+            SELECT p.*
+              FROM payment p
+             WHERE p.channel = 'PG'
+               AND p.status = 'PENDING'
+               AND p.created_at < :createdBefore
+               AND p.created_at >= :createdAfter
+             ORDER BY p.created_at
+             LIMIT :limit
+            """, nativeQuery = true)
+    List<Payment> findPendingPgPayments(@Param("createdBefore") LocalDateTime createdBefore,
+                                        @Param("createdAfter") LocalDateTime createdAfter,
+                                        @Param("limit") int limit);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE payment
